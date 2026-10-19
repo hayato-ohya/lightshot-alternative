@@ -5,6 +5,7 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
     private let prefs = Preferences.shared
     private var recorder: HotKeyRecorderView!
     private var recordRecorder: HotKeyRecorderView!
+    private var fullPageRecorder: HotKeyRecorderView!
     private var pathLabel: NSTextField!
     private var formatPopup: NSPopUpButton!
     private var copyAfterSaveCheck: NSButton!
@@ -65,6 +66,15 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         copyAfterSaveCheck = NSButton(checkboxWithTitle: "Also copy to clipboard when saving", target: self, action: #selector(toggleCopyAfterSave))
         copyAfterSaveCheck.state = prefs.copyAfterSave ? .on : .off
 
+        // Full page
+        fullPageRecorder = HotKeyRecorderView(hotKey: prefs.fullPageHotKey)
+        fullPageRecorder.resetValue = .defaultFullPage
+        fullPageRecorder.onChange = { [prefs] hk in prefs.fullPageHotKey = hk }
+        let resetFullPageButton = NSButton(title: "Reset", target: self, action: #selector(resetFullPageHotKey))
+        resetFullPageButton.bezelStyle = .rounded
+        let fullPageRow = NSStackView(views: [fullPageRecorder, resetFullPageButton])
+        fullPageRow.spacing = 8
+
         // Recording
         recordRecorder = HotKeyRecorderView(hotKey: prefs.recordingHotKey)
         recordRecorder.resetValue = .defaultRecording
@@ -94,6 +104,8 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
             [label("Shortcut:"), hotKeyRow],
             [label("Format:"), formatPopup],
             [NSGridCell.emptyContentView, copyAfterSaveCheck],
+            [NSGridCell.emptyContentView, header("Full Web Page")],
+            [label("Shortcut:"), fullPageRow],
             [NSGridCell.emptyContentView, header("Recording")],
             [label("Shortcut:"), recordHotKeyRow],
             [label("Audio:"), audioPopup],
@@ -106,7 +118,7 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         grid.rowSpacing = 8
         grid.columnSpacing = 10
         grid.column(at: 0).xPlacement = .trailing
-        for row in [4, 10] { grid.row(at: row).topPadding = 10 }
+        for row in [4, 6, 12] { grid.row(at: row).topPadding = 10 }
         grid.translatesAutoresizingMaskIntoConstraints = false
 
         let content = window!.contentView!
@@ -132,6 +144,7 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         loginCheck.state = SMAppService.mainApp.status == .enabled ? .on : .off
         recorder.hotKey = prefs.hotKey
         recordRecorder.hotKey = prefs.recordingHotKey
+        fullPageRecorder.hotKey = prefs.fullPageHotKey
         pathLabel.stringValue = prefs.saveDirectory.path
         audioPopup.selectItem(at: AudioSource.allCases.firstIndex(of: prefs.audioSource) ?? 0)
         cursorCheck.state = prefs.recordingShowsCursor ? .on : .off
@@ -143,6 +156,11 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
     @objc private func resetHotKey() {
         prefs.hotKey = .default
         recorder.hotKey = .default
+    }
+
+    @objc private func resetFullPageHotKey() {
+        prefs.fullPageHotKey = .defaultFullPage
+        fullPageRecorder.hotKey = .defaultFullPage
     }
 
     @objc private func resetRecordHotKey() {

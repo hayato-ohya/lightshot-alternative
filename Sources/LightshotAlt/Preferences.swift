@@ -7,6 +7,7 @@ struct HotKey: Equatable {
 
     static let `default` = HotKey(keyCode: 25 /* 9 */, modifiers: [.command, .shift])
     static let defaultRecording = HotKey(keyCode: 29 /* 0 */, modifiers: [.command, .shift])
+    static let defaultFullPage = HotKey(keyCode: 28 /* 8 */, modifiers: [.command, .shift])
 
     var carbonModifiers: UInt32 {
         var m: UInt32 = 0
@@ -73,6 +74,8 @@ final class Preferences {
         static let copyAfterSave = "copyAfterSave"
         static let recordKeyCode = "recordHotKeyCode"
         static let recordModifiers = "recordHotKeyModifiers"
+        static let fullPageKeyCode = "fullPageHotKeyCode"
+        static let fullPageModifiers = "fullPageHotKeyModifiers"
         static let audioSource = "recordingAudioSource"
         static let showCursor = "recordingShowsCursor"
         static let askWhereToSaveRecording = "askWhereToSaveRecording"
@@ -100,6 +103,19 @@ final class Preferences {
         set {
             defaults.set(Int(newValue.keyCode), forKey: Key.recordKeyCode)
             defaults.set(Int(newValue.modifiers.rawValue), forKey: Key.recordModifiers)
+            NotificationCenter.default.post(name: Preferences.hotKeyDidChange, object: nil)
+        }
+    }
+
+    var fullPageHotKey: HotKey {
+        get {
+            guard defaults.object(forKey: Key.fullPageKeyCode) != nil else { return .defaultFullPage }
+            return HotKey(keyCode: UInt16(defaults.integer(forKey: Key.fullPageKeyCode)),
+                          modifiers: NSEvent.ModifierFlags(rawValue: UInt(defaults.integer(forKey: Key.fullPageModifiers))))
+        }
+        set {
+            defaults.set(Int(newValue.keyCode), forKey: Key.fullPageKeyCode)
+            defaults.set(Int(newValue.modifiers.rawValue), forKey: Key.fullPageModifiers)
             NotificationCenter.default.post(name: Preferences.hotKeyDidChange, object: nil)
         }
     }

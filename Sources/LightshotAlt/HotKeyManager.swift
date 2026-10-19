@@ -10,6 +10,7 @@ final class HotKeyManager {
         case screenshot = 1
         case recording = 2
         case stopRecording = 3
+        case fullPage = 4
     }
 
     var onPressed: ((ID) -> Void)?

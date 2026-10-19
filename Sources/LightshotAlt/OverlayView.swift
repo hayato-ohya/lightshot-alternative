@@ -7,11 +7,12 @@ protocol OverlayViewDelegate: AnyObject {
     func overlayView(_ view: OverlayView, save image: CGImage)
     func overlayViewDidRequestCancel(_ view: OverlayView)
     func overlayView(_ view: OverlayView, startRecording rect: CGRect)
+    func overlayView(_ view: OverlayView, pickedWindow window: WindowInfo)
 }
 
 /// Full-screen selection + annotation layer. Coordinates are flipped (origin top-left) points.
 final class OverlayView: NSView, NSTextFieldDelegate {
-    enum Mode { case screenshot, recording }
+    enum Mode { case screenshot, recording, windowPick }
 
     private enum Handle: CaseIterable {
         case topLeft, top, topRight, right, bottomRight, bottom, bottomLeft, left
@@ -46,7 +47,7 @@ final class OverlayView: NSView, NSTextFieldDelegate {
     let screenshot: CGImage
     let scale: CGFloat
     let mode: Mode
-    private let windowFrames: [CGRect] // local flipped coords
+    private let windows: [WindowInfo] // frames in local flipped coords
     weak var delegate: OverlayViewDelegate?
 
     var selection: CGRect? { didSet { sizeLabel.isHidden = selection == nil } }
@@ -73,11 +74,11 @@ final class OverlayView: NSView, NSTextFieldDelegate {
         .systemBlue, .systemPurple, .white, .black,
     ]
 
-    init(frame: CGRect, screenshot: CGImage, scale: CGFloat, windowFrames: [CGRect], mode: Mode = .screenshot) {
+    init(frame: CGRect, screenshot: CGImage, scale: CGFloat, windows: [WindowInfo], mode: Mode = .screenshot) {
         self.screenshot = screenshot
         self.scale = scale
         self.mode = mode
-        self.windowFrames = windowFrames
+        self.windows = windows
         super.init(frame: frame)
         wantsLayer = true
         buildChrome()
@@ -93,6 +94,20 @@ final class OverlayView: NSView, NSTextFieldDelegate {
     // MARK: - Chrome
 
     private func buildChrome() {
+        if mode == .windowPick {
+            hintLabel.stringValue = "Click a Safari or Chrome window to capture the whole page  ·  Esc to cancel"
+            hintLabel.font = .systemFont(ofSize: 13, weight: .medium)
+            hintLabel.textColor = .white
+            hintLabel.wantsLayer = true
+            hintLabel.layer?.backgroundColor = NSColor(white: 0.1, alpha: 0.85).cgColor
+            hintLabel.layer?.cornerRadius = 4
+            hintLabel.alignment = .center
+            addSubview(hintLabel)
+            toolsBar.isHidden = true
+            actionsBar.isHidden = true
+            layoutHint()
+            return
+        }
         if mode == .recording {
             hintLabel.stringValue = "Drag to select the area to record  ·  Click a window  ·  ↩ to start  ·  Esc to cancel"
             actionsBar.addButton(symbol: "record.circle", tooltip: "Start recording (↩)", target: self, action: #selector(recordAction(_:)))
@@ -293,8 +308,12 @@ final class OverlayView: NSView, NSTextFieldDelegate {
         return nil
     }
 
+    private func window(at p: CGPoint) -> WindowInfo? {
+        windows.first { $0.frame.contains(p) }
+    }
+
     private func windowFrame(at p: CGPoint) -> CGRect? {
-        windowFrames.first { $0.contains(p) }?.intersection(bounds)
+        window(at: p)?.frame.intersection(bounds)
     }
 
     private func clamp(_ p: CGPoint, to r: CGRect) -> CGPoint {
@@ -362,6 +381,11 @@ final class OverlayView: NSView, NSTextFieldDelegate {
             window?.makeKeyAndOrderFront(nil)
             window?.makeFirstResponder(self)
         }
+        if mode == .windowPick {
+            let p = convert(event.locationInWindow, from: nil)
+            if let picked = window(at: p) { delegate?.overlayView(self, pickedWindow: picked) }
+            return
+        }
         let p = convert(event.locationInWindow, from: nil)
         if textField != nil { commitText() }
 
@@ -405,6 +429,7 @@ final class OverlayView: NSView, NSTextFieldDelegate {
     }
 
     override func mouseDragged(with event: NSEvent) {
+        if mode == .windowPick { return }
         let p = clamp(convert(event.locationInWindow, from: nil), to: bounds)
         switch drag {
         case .none:
@@ -445,6 +470,7 @@ final class OverlayView: NSView, NSTextFieldDelegate {
     }
 
     override func mouseUp(with event: NSEvent) {
+        if mode == .windowPick { return }
         let p = convert(event.locationInWindow, from: nil)
         switch drag {
         case .none:
