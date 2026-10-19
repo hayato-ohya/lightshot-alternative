@@ -6,8 +6,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private var captureMenuItem: NSMenuItem!
     private var recordMenuItem: NSMenuItem!
-    private var audioItems: [AudioSource: NSMenuItem] = [:]
-    private var cursorItem: NSMenuItem!
     private var session: CaptureSession?
     private var preferencesController: PreferencesWindowController?
     private var capturing = false
@@ -71,22 +69,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         recordMenuItem.target = self
         menu.addItem(recordMenuItem)
 
-        let options = NSMenu(title: "Recording Options")
-        for source in AudioSource.allCases {
-            let item = NSMenuItem(title: source.title, action: #selector(selectAudioSource(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = source.rawValue
-            options.addItem(item)
-            audioItems[source] = item
-        }
-        options.addItem(.separator())
-        cursorItem = NSMenuItem(title: "Show Cursor in Recording", action: #selector(toggleCursor), keyEquivalent: "")
-        cursorItem.target = self
-        options.addItem(cursorItem)
-        let optionsItem = NSMenuItem(title: "Recording Options", action: nil, keyEquivalent: "")
-        optionsItem.submenu = options
-        menu.addItem(optionsItem)
-
         menu.addItem(.separator())
         let prefsItem = NSMenuItem(title: "Preferences…", action: #selector(showPreferences), keyEquivalent: ",")
         prefsItem.target = self
@@ -105,8 +87,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let prefs = Preferences.shared
         captureMenuItem.title = "Take Screenshot  (\(prefs.hotKey.displayString))"
         recordMenuItem.title = (recorder != nil ? "Stop Recording" : "Start Recording") + "  (\(prefs.recordingHotKey.displayString))"
-        for (source, item) in audioItems { item.state = source == prefs.audioSource ? .on : .off }
-        cursorItem.state = prefs.recordingShowsCursor ? .on : .off
     }
 
     private func showIdleStatusIcon() {
@@ -335,16 +315,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 NSAlert(error: error).runModal()
             }
         }
-    }
-
-    @objc private func selectAudioSource(_ sender: NSMenuItem) {
-        if let raw = sender.representedObject as? String, let source = AudioSource(rawValue: raw) {
-            Preferences.shared.audioSource = source
-        }
-    }
-
-    @objc private func toggleCursor() {
-        Preferences.shared.recordingShowsCursor.toggle()
     }
 
     // MARK: - Self test (development aid)

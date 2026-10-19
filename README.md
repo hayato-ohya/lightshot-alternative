@@ -22,7 +22,7 @@ No Rosetta 2, no third-party dependencies: just Swift, AppKit and ScreenCaptureK
   - Audio: system audio, microphone, both mixed together, or mute
   - Show or hide the cursor; optionally ask where to save each recording
   - While recording, everything outside the recorded area is dimmed (the dimming is not captured)
-  - Options are in Preferences and in the menu bar under "Recording Options"
+  - Options are in Preferences under "Recording"
 
 ### Requirements
 
@@ -128,7 +128,7 @@ Rosetta 2 に依存せず、Swift + AppKit + ScreenCaptureKit だけで作られ
   - 音源: システム音声 / マイク / システム音声＋マイク（ミックス） / ミュート
   - カーソルの表示・非表示、録画ごとに保存先を尋ねるかどうか
   - 録画中は録画範囲以外が暗く表示されます（暗転は録画には映りません）
-  - オプションは設定画面とメニューバーの「Recording Options」の両方から変更可能
+  - オプションは設定画面の「Recording」で変更
 
 ### 必要環境
 
