@@ -6,10 +6,13 @@ protocol OverlayViewDelegate: AnyObject {
     func overlayView(_ view: OverlayView, copy image: CGImage)
     func overlayView(_ view: OverlayView, save image: CGImage)
     func overlayViewDidRequestCancel(_ view: OverlayView)
+    func overlayView(_ view: OverlayView, startRecording rect: CGRect)
 }
 
 /// Full-screen selection + annotation layer. Coordinates are flipped (origin top-left) points.
 final class OverlayView: NSView, NSTextFieldDelegate {
+    enum Mode { case screenshot, recording }
+
     private enum Handle: CaseIterable {
         case topLeft, top, topRight, right, bottomRight, bottom, bottomLeft, left
 
@@ -42,6 +45,7 @@ final class OverlayView: NSView, NSTextFieldDelegate {
 
     let screenshot: CGImage
     let scale: CGFloat
+    let mode: Mode
     private let windowFrames: [CGRect] // local flipped coords
     weak var delegate: OverlayViewDelegate?
 
@@ -69,9 +73,10 @@ final class OverlayView: NSView, NSTextFieldDelegate {
         .systemBlue, .systemPurple, .white, .black,
     ]
 
-    init(frame: CGRect, screenshot: CGImage, scale: CGFloat, windowFrames: [CGRect]) {
+    init(frame: CGRect, screenshot: CGImage, scale: CGFloat, windowFrames: [CGRect], mode: Mode = .screenshot) {
         self.screenshot = screenshot
         self.scale = scale
+        self.mode = mode
         self.windowFrames = windowFrames
         super.init(frame: frame)
         wantsLayer = true
@@ -88,6 +93,29 @@ final class OverlayView: NSView, NSTextFieldDelegate {
     // MARK: - Chrome
 
     private func buildChrome() {
+        if mode == .recording {
+            hintLabel.stringValue = "Drag to select the area to record  ·  Click a window  ·  ↩ to start  ·  Esc to cancel"
+            actionsBar.addButton(symbol: "record.circle", tooltip: "Start recording (↩)", target: self, action: #selector(recordAction(_:)))
+                .contentTintColor = .systemRed
+            actionsBar.addButton(symbol: "xmark", tooltip: "Cancel (Esc)", target: self, action: #selector(cancelAction(_:)))
+            actionsBar.fit()
+            actionsBar.isHidden = true
+            addSubview(actionsBar)
+            toolsBar.isHidden = true
+            for label in [sizeLabel, hintLabel] {
+                label.font = .monospacedDigitSystemFont(ofSize: 11, weight: .medium)
+                label.textColor = .white
+                label.wantsLayer = true
+                label.layer?.backgroundColor = NSColor(white: 0.1, alpha: 0.85).cgColor
+                label.layer?.cornerRadius = 4
+                label.alignment = .center
+                addSubview(label)
+            }
+            hintLabel.font = .systemFont(ofSize: 13, weight: .medium)
+            sizeLabel.isHidden = true
+            layoutHint()
+            return
+        }
         for t in Tool.allCases {
             let b = toolsBar.addButton(symbol: t.symbolName, tooltip: t.title, target: self, action: #selector(toolButtonClicked(_:)))
             b.tag = Tool.allCases.firstIndex(of: t)!
@@ -144,7 +172,7 @@ final class OverlayView: NSView, NSTextFieldDelegate {
         }
         let idle: Bool
         if case .none = drag { idle = true } else { idle = false }
-        toolsBar.isHidden = !idle
+        toolsBar.isHidden = !idle || mode == .recording
         actionsBar.isHidden = !idle
         hintLabel.isHidden = true
 
@@ -287,7 +315,6 @@ final class OverlayView: NSView, NSTextFieldDelegate {
     private func updateCursor(at p: CGPoint) {
         if let sel = selection, case .none = drag {
             if let h = handle(at: p) {
-                if #available(macOS 15, *) {
                     let pos: NSCursor.FrameResizePosition = {
                         switch h {
                         case .topLeft: return .topLeft
@@ -301,9 +328,6 @@ final class OverlayView: NSView, NSTextFieldDelegate {
                         }
                     }()
                     NSCursor.frameResize(position: pos, directions: [.inward, .outward]).set()
-                } else {
-                    NSCursor.crosshair.set()
-                }
                 return
             }
             if tool == nil, sel.contains(p) {
@@ -452,7 +476,7 @@ final class OverlayView: NSView, NSTextFieldDelegate {
         case 53: // Esc
             delegate?.overlayViewDidRequestCancel(self)
         case 36, 76: // Return / Enter
-            copyAction(nil)
+            if mode == .recording { recordAction(nil) } else { copyAction(nil) }
         case 123, 124, 125, 126: // arrows
             nudge(keyCode: event.keyCode, resize: flags.contains(.shift))
         default:
@@ -464,9 +488,9 @@ final class OverlayView: NSView, NSTextFieldDelegate {
         let flags = event.modifierFlags.intersection([.command, .shift, .option, .control])
         guard flags == [.command], let chars = event.charactersIgnoringModifiers?.lowercased() else { return false }
         switch chars {
-        case "c": copyAction(nil); return true
-        case "s": saveAction(nil); return true
-        case "z": undo(nil); return true
+        case "c" where mode == .screenshot: copyAction(nil); return true
+        case "s" where mode == .screenshot: saveAction(nil); return true
+        case "z" where mode == .screenshot: undo(nil); return true
         case "a": selectAll(nil); return true
         case "q", "w": delegate?.overlayViewDidRequestCancel(self); return true
         default: return false
@@ -634,6 +658,11 @@ final class OverlayView: NSView, NSTextFieldDelegate {
 
     @objc private func cancelAction(_ sender: Any?) {
         delegate?.overlayViewDidRequestCancel(self)
+    }
+
+    @objc private func recordAction(_ sender: Any?) {
+        guard mode == .recording, let sel = selection, sel.width >= 2, sel.height >= 2 else { return }
+        delegate?.overlayView(self, startRecording: sel)
     }
 
     // MARK: - Text entry

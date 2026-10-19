@@ -1,13 +1,14 @@
-// swift-tools-version:5.9
+// swift-tools-version:6.0
 import PackageDescription
 
 let package = Package(
     name: "LightshotAlt",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS(.v15)],
     targets: [
         .executableTarget(
             name: "LightshotAlt",
             path: "Sources/LightshotAlt",
+            swiftSettings: [.swiftLanguageMode(.v5)],
             linkerSettings: [
                 .linkedFramework("Carbon"),
                 .linkedFramework("ScreenCaptureKit"),
@@ -16,4 +17,4 @@ let package = Package(
         )
     ]
 )
-package.targets.append(.testTarget(name: "LightshotAltTests", dependencies: ["LightshotAlt"], path: "Tests/LightshotAltTests"))
+package.targets.append(.testTarget(name: "LightshotAltTests", dependencies: ["LightshotAlt"], path: "Tests/LightshotAltTests", swiftSettings: [.swiftLanguageMode(.v5)]))

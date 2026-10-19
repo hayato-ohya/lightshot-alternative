@@ -6,6 +6,7 @@ struct HotKey: Equatable {
     var modifiers: NSEvent.ModifierFlags
 
     static let `default` = HotKey(keyCode: 25 /* 9 */, modifiers: [.command, .shift])
+    static let defaultRecording = HotKey(keyCode: 29 /* 0 */, modifiers: [.command, .shift])
 
     var carbonModifiers: UInt32 {
         var m: UInt32 = 0
@@ -70,6 +71,12 @@ final class Preferences {
         static let saveDirectory = "saveDirectory"
         static let imageFormat = "imageFormat"
         static let copyAfterSave = "copyAfterSave"
+        static let recordKeyCode = "recordHotKeyCode"
+        static let recordModifiers = "recordHotKeyModifiers"
+        static let recordingMode = "recordingMode"
+        static let audioSource = "recordingAudioSource"
+        static let showCursor = "recordingShowsCursor"
+        static let askWhereToSaveRecording = "askWhereToSaveRecording"
     }
 
     var hotKey: HotKey {
@@ -83,6 +90,43 @@ final class Preferences {
             defaults.set(Int(newValue.modifiers.rawValue), forKey: Key.modifiers)
             NotificationCenter.default.post(name: Preferences.hotKeyDidChange, object: nil)
         }
+    }
+
+    var recordingHotKey: HotKey {
+        get {
+            guard defaults.object(forKey: Key.recordKeyCode) != nil else { return .defaultRecording }
+            return HotKey(keyCode: UInt16(defaults.integer(forKey: Key.recordKeyCode)),
+                          modifiers: NSEvent.ModifierFlags(rawValue: UInt(defaults.integer(forKey: Key.recordModifiers))))
+        }
+        set {
+            defaults.set(Int(newValue.keyCode), forKey: Key.recordKeyCode)
+            defaults.set(Int(newValue.modifiers.rawValue), forKey: Key.recordModifiers)
+            NotificationCenter.default.post(name: Preferences.hotKeyDidChange, object: nil)
+        }
+    }
+
+    var recordingMode: RecordingMode {
+        get { RecordingMode(rawValue: defaults.string(forKey: Key.recordingMode) ?? "") ?? .screen }
+        set { defaults.set(newValue.rawValue, forKey: Key.recordingMode) }
+    }
+
+    var audioSource: AudioSource {
+        get { AudioSource(rawValue: defaults.string(forKey: Key.audioSource) ?? "") ?? .both }
+        set { defaults.set(newValue.rawValue, forKey: Key.audioSource) }
+    }
+
+    var recordingShowsCursor: Bool {
+        get { defaults.object(forKey: Key.showCursor) == nil ? true : defaults.bool(forKey: Key.showCursor) }
+        set { defaults.set(newValue, forKey: Key.showCursor) }
+    }
+
+    var askWhereToSaveRecording: Bool {
+        get { defaults.bool(forKey: Key.askWhereToSaveRecording) }
+        set { defaults.set(newValue, forKey: Key.askWhereToSaveRecording) }
+    }
+
+    var recordingOptions: RecordingOptions {
+        RecordingOptions(mode: recordingMode, audioSource: audioSource, showCursor: recordingShowsCursor)
     }
 
     var saveDirectory: URL {

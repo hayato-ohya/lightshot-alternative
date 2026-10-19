@@ -11,10 +11,15 @@ final class OverlayWindow: NSWindow {
 final class CaptureSession: OverlayViewDelegate {
     private var windows: [OverlayWindow] = []
     private var views: [OverlayView] = []
+    private var screens: [NSScreen] = []
+    let mode: OverlayView.Mode
     var onFinish: (() -> Void)?
+    /// Recording mode only: the user confirmed a region (points, relative to the screen's top-left).
+    var onStartRecording: ((NSScreen, CGRect) -> Void)?
     private var finished = false
 
-    init(result: CaptureResult) {
+    init(result: CaptureResult, mode: OverlayView.Mode = .screenshot) {
+        self.mode = mode
         let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
         for shot in result.shots {
             let screenFrame = shot.screen.frame
@@ -47,7 +52,7 @@ final class CaptureSession: OverlayViewDelegate {
             container.addSubview(imageView)
 
             let overlay = OverlayView(frame: container.bounds, screenshot: shot.image,
-                                      scale: shot.screen.backingScaleFactor, windowFrames: localFrames)
+                                      scale: shot.screen.backingScaleFactor, windowFrames: localFrames, mode: mode)
             overlay.autoresizingMask = [.width, .height]
             overlay.delegate = self
             container.addSubview(overlay)
@@ -55,6 +60,7 @@ final class CaptureSession: OverlayViewDelegate {
             window.contentView = container
             windows.append(window)
             views.append(overlay)
+            screens.append(shot.screen)
         }
     }
 
@@ -135,6 +141,13 @@ final class CaptureSession: OverlayViewDelegate {
 
     func overlayViewDidRequestCancel(_ view: OverlayView) {
         finish()
+    }
+
+    func overlayView(_ view: OverlayView, startRecording rect: CGRect) {
+        guard let index = views.firstIndex(where: { $0 === view }) else { return }
+        let screen = screens[index]
+        finish()
+        onStartRecording?(screen, rect)
     }
 
     // MARK: - Helpers

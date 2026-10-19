@@ -18,10 +18,15 @@ No Rosetta 2, no third-party dependencies: just Swift, AppKit and ScreenCaptureK
 - **⌘C / Enter** copies to the clipboard, **⌘S** saves (PNG / JPEG), **Esc** cancels
 - Multi-display support, exports at native Retina resolution
 - Preferences: hot key, save folder, image format, copy-after-save, launch at login
+- **Screen recording** with a second hot key (default **⇧⌘0**): select an area the same way, press ↩ to start, press the hot key again or click the red timer in the menu bar to stop. Saved as .mp4 (H.264 + AAC) in the save folder
+  - Mode: screen + audio, or audio only (.m4a)
+  - Audio: system audio, microphone, both mixed together, or mute
+  - Show or hide the cursor; optionally ask where to save each recording
+  - Options are in Preferences and in the menu bar under "Recording Options"
 
 ### Requirements
 
-- macOS 14 (Sonoma) or later, Apple Silicon or Intel
+- macOS 15 (Sequoia) or later, Apple Silicon or Intel
 - Xcode (Command Line Tools are enough) to build
 
 ### Build and install
@@ -59,6 +64,8 @@ xattr -dr com.apple.quarantine "/Applications/Lightshot Alternative.app"
 The first capture asks for Screen Recording access. Enable "Lightshot Alternative" under
 **System Settings → Privacy & Security → Screen & System Audio Recording**, then relaunch the app.
 
+Recording with the microphone additionally asks for Microphone access the first time.
+
 "Launch at login" only works when the app runs from the .app bundle in `/Applications`.
 
 ### Usage
@@ -67,6 +74,8 @@ The first capture asks for Screen Recording access. Enable "Lightshot Alternativ
 2. Drag to select an area (or click a window)
 3. Annotate with the toolbar on the right; the color button opens color, line width and text size
 4. Click Copy or Save in the bar below, or press ⌘C / ⌘S
+
+To record: press ⇧⌘0, select the area, press ↩. The menu bar shows a red dot with the elapsed time; press ⇧⌘0 again (or choose Stop Recording) to finish. In Audio Only mode the recording starts immediately.
 
 ### Troubleshooting
 
@@ -87,6 +96,8 @@ defaults delete com.hayato.lightshot-alternative debugLogging             # disa
 | `Sources/LightshotAlt/CaptureSession.swift` | One overlay window per display, copy and save |
 | `Sources/LightshotAlt/OverlayView.swift` | Selection, annotations, toolbars, export |
 | `Sources/LightshotAlt/Annotation.swift` | Annotation drawing |
+| `Sources/LightshotAlt/ScreenRecorder.swift` | Screen / audio recording with SCStream and AVAssetWriter |
+| `Sources/LightshotAlt/AudioPipeline.swift` | Converts and mixes system audio and microphone |
 | `Sources/LightshotAlt/PreferencesWindowController.swift` | Preferences window |
 | `scripts/generate-icon.swift` | Generates the app icon and the menu bar icon |
 | `scripts/make-signing-cert.sh` | Creates the self-signed signing certificate |
@@ -112,10 +123,15 @@ Rosetta 2 に依存せず、Swift + AppKit + ScreenCaptureKit だけで作られ
 - **⌘C / Enter** でクリップボードへコピー、**⌘S** で保存（PNG / JPEG）、**Esc** でキャンセル
 - マルチディスプレイ対応、Retina 解像度で書き出し
 - 設定: ホットキー、保存先フォルダ、画像形式、保存時にコピーも行う、ログイン時に起動
+- **画面録画**（既定ホットキー **⇧⌘0**）: 同じ操作で範囲を選び ↩ で開始、もう一度ホットキーを押すかメニューバーの赤いタイマーをクリックで停止。保存先フォルダに .mp4（H.264 + AAC）で保存
+  - モード: 画面＋音声 / 音声のみ（.m4a）
+  - 音源: システム音声 / マイク / システム音声＋マイク（ミックス） / ミュート
+  - カーソルの表示・非表示、録画ごとに保存先を尋ねるかどうか
+  - オプションは設定画面とメニューバーの「Recording Options」の両方から変更可能
 
 ### 必要環境
 
-- macOS 14 (Sonoma) 以降、Apple Silicon または Intel
+- macOS 15 (Sequoia) 以降、Apple Silicon または Intel
 - ビルドには Xcode（Command Line Tools だけでも可）
 
 ### ビルドとインストール
@@ -155,6 +171,8 @@ xattr -dr com.apple.quarantine "/Applications/Lightshot Alternative.app"
 **システム設定 → プライバシーとセキュリティ → 画面収録とシステムオーディオ録音** で
 「Lightshot Alternative」を有効にし、アプリを再起動してください。
 
+マイクを使う録画では、初回にマイクの許可も求められます。
+
 「ログイン時に起動」は `/Applications` に入れた .app から起動している場合のみ機能します。
 
 ### 使い方
@@ -163,6 +181,8 @@ xattr -dr com.apple.quarantine "/Applications/Lightshot Alternative.app"
 2. ドラッグで範囲を選択（ウィンドウをクリックでも可）
 3. 右側のツールバーで注釈を描く。色ボタンから色・線幅・文字サイズを変更
 4. 下のバーの「コピー」または「保存」、もしくは ⌘C / ⌘S
+
+録画は ⇧⌘0 → 範囲を選択 → ↩ で開始。メニューバーに赤い●と経過時間が表示され、もう一度 ⇧⌘0（または Stop Recording）で終了します。「音声のみ」モードでは即座に録音が始まります。
 
 ### トラブルシューティング
 
@@ -183,6 +203,8 @@ defaults delete com.hayato.lightshot-alternative debugLogging             # 無�
 | `Sources/LightshotAlt/CaptureSession.swift` | ディスプレイごとのオーバーレイウィンドウ、コピー・保存 |
 | `Sources/LightshotAlt/OverlayView.swift` | 範囲選択・注釈・ツールバー・書き出し |
 | `Sources/LightshotAlt/Annotation.swift` | 注釈の描画 |
+| `Sources/LightshotAlt/ScreenRecorder.swift` | SCStream と AVAssetWriter による画面・音声の録画 |
+| `Sources/LightshotAlt/AudioPipeline.swift` | システム音声とマイクの変換・ミックス |
 | `Sources/LightshotAlt/PreferencesWindowController.swift` | 設定画面 |
 | `scripts/generate-icon.swift` | アプリアイコンとメニューバーアイコンの生成 |
 | `scripts/make-signing-cert.sh` | 自己署名の署名証明書の作成 |

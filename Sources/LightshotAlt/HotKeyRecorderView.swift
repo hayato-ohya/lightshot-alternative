@@ -4,6 +4,7 @@ import AppKit
 final class HotKeyRecorderView: NSView {
     var hotKey: HotKey { didSet { needsDisplay = true } }
     var onChange: ((HotKey) -> Void)?
+    var resetValue: HotKey = .default
     private var recording = false
 
     init(hotKey: HotKey) {

@@ -4,13 +4,18 @@ import ServiceManagement
 final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
     private let prefs = Preferences.shared
     private var recorder: HotKeyRecorderView!
+    private var recordRecorder: HotKeyRecorderView!
     private var pathLabel: NSTextField!
     private var formatPopup: NSPopUpButton!
     private var copyAfterSaveCheck: NSButton!
     private var loginCheck: NSButton!
+    private var modePopup: NSPopUpButton!
+    private var audioPopup: NSPopUpButton!
+    private var cursorCheck: NSButton!
+    private var askRecordingCheck: NSButton!
 
     init() {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 440, height: 240),
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 420),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = "Lightshot Alternative Preferences"
         window.isReleasedWhenClosed = false
@@ -22,7 +27,20 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    private func label(_ s: String) -> NSTextField {
+        let l = NSTextField(labelWithString: s)
+        l.alignment = .right
+        return l
+    }
+
+    private func header(_ s: String) -> NSTextField {
+        let l = NSTextField(labelWithString: s)
+        l.font = .boldSystemFont(ofSize: 13)
+        return l
+    }
+
     private func buildUI() {
+        // Screenshot
         recorder = HotKeyRecorderView(hotKey: prefs.hotKey)
         recorder.onChange = { [prefs] hk in prefs.hotKey = hk }
         let resetButton = NSButton(title: "Reset", target: self, action: #selector(resetHotKey))
@@ -33,7 +51,7 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         pathLabel = NSTextField(labelWithString: prefs.saveDirectory.path)
         pathLabel.lineBreakMode = .byTruncatingMiddle
         pathLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        pathLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 220).isActive = true
+        pathLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 240).isActive = true
         let chooseButton = NSButton(title: "Choose…", target: self, action: #selector(chooseFolder))
         chooseButton.bezelStyle = .rounded
         let folderRow = NSStackView(views: [pathLabel, chooseButton])
@@ -47,24 +65,56 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
 
         copyAfterSaveCheck = NSButton(checkboxWithTitle: "Also copy to clipboard when saving", target: self, action: #selector(toggleCopyAfterSave))
         copyAfterSaveCheck.state = prefs.copyAfterSave ? .on : .off
+
+        // Recording
+        recordRecorder = HotKeyRecorderView(hotKey: prefs.recordingHotKey)
+        recordRecorder.resetValue = .defaultRecording
+        recordRecorder.onChange = { [prefs] hk in prefs.recordingHotKey = hk }
+        let resetRecordButton = NSButton(title: "Reset", target: self, action: #selector(resetRecordHotKey))
+        resetRecordButton.bezelStyle = .rounded
+        let recordHotKeyRow = NSStackView(views: [recordRecorder, resetRecordButton])
+        recordHotKeyRow.spacing = 8
+
+        modePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+        for m in RecordingMode.allCases { modePopup.addItem(withTitle: m.title) }
+        modePopup.selectItem(at: RecordingMode.allCases.firstIndex(of: prefs.recordingMode) ?? 0)
+        modePopup.target = self
+        modePopup.action = #selector(modeChanged)
+
+        audioPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+        for s in AudioSource.allCases { audioPopup.addItem(withTitle: s.title) }
+        audioPopup.selectItem(at: AudioSource.allCases.firstIndex(of: prefs.audioSource) ?? 0)
+        audioPopup.target = self
+        audioPopup.action = #selector(audioChanged)
+
+        cursorCheck = NSButton(checkboxWithTitle: "Show cursor in screen recordings", target: self, action: #selector(toggleCursor))
+        cursorCheck.state = prefs.recordingShowsCursor ? .on : .off
+        askRecordingCheck = NSButton(checkboxWithTitle: "Ask where to save each recording", target: self, action: #selector(toggleAskRecording))
+        askRecordingCheck.state = prefs.askWhereToSaveRecording ? .on : .off
+
+        // General
         loginCheck = NSButton(checkboxWithTitle: "Launch at login", target: self, action: #selector(toggleLogin))
         loginCheck.state = SMAppService.mainApp.status == .enabled ? .on : .off
 
-        func label(_ s: String) -> NSTextField {
-            let l = NSTextField(labelWithString: s)
-            l.alignment = .right
-            return l
-        }
         let grid = NSGridView(views: [
+            [NSGridCell.emptyContentView, header("Screenshot")],
             [label("Shortcut:"), hotKeyRow],
-            [label("Save to:"), folderRow],
             [label("Format:"), formatPopup],
             [NSGridCell.emptyContentView, copyAfterSaveCheck],
+            [NSGridCell.emptyContentView, header("Recording")],
+            [label("Shortcut:"), recordHotKeyRow],
+            [label("Mode:"), modePopup],
+            [label("Audio:"), audioPopup],
+            [NSGridCell.emptyContentView, cursorCheck],
+            [NSGridCell.emptyContentView, askRecordingCheck],
+            [NSGridCell.emptyContentView, header("General")],
+            [label("Save to:"), folderRow],
             [NSGridCell.emptyContentView, loginCheck],
         ])
-        grid.rowSpacing = 10
+        grid.rowSpacing = 8
         grid.columnSpacing = 10
         grid.column(at: 0).xPlacement = .trailing
+        for row in [4, 10] { grid.row(at: row).topPadding = 10 }
         grid.translatesAutoresizingMaskIntoConstraints = false
 
         let content = window!.contentView!
@@ -75,17 +125,25 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
             grid.trailingAnchor.constraint(lessThanOrEqualTo: content.trailingAnchor, constant: -20),
             grid.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -20),
         ])
+        content.layoutSubtreeIfNeeded()
+        let size = grid.fittingSize
+        window!.setContentSize(NSSize(width: max(480, size.width + 40), height: size.height + 40))
     }
 
     func windowWillClose(_ notification: Notification) {
-        window?.makeFirstResponder(nil) // ends shortcut recording, which resumes the hot key
+        window?.makeFirstResponder(nil) // ends shortcut recording, which resumes the hot keys
         HotKeyManager.shared.resume()
     }
 
     override func showWindow(_ sender: Any?) {
+        let prefs = self.prefs
         loginCheck.state = SMAppService.mainApp.status == .enabled ? .on : .off
         recorder.hotKey = prefs.hotKey
+        recordRecorder.hotKey = prefs.recordingHotKey
         pathLabel.stringValue = prefs.saveDirectory.path
+        modePopup.selectItem(at: RecordingMode.allCases.firstIndex(of: prefs.recordingMode) ?? 0)
+        audioPopup.selectItem(at: AudioSource.allCases.firstIndex(of: prefs.audioSource) ?? 0)
+        cursorCheck.state = prefs.recordingShowsCursor ? .on : .off
         NSApp.activate(ignoringOtherApps: true)
         super.showWindow(sender)
         window?.makeKeyAndOrderFront(nil)
@@ -94,6 +152,11 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
     @objc private func resetHotKey() {
         prefs.hotKey = .default
         recorder.hotKey = .default
+    }
+
+    @objc private func resetRecordHotKey() {
+        prefs.recordingHotKey = .defaultRecording
+        recordRecorder.hotKey = .defaultRecording
     }
 
     @objc private func chooseFolder() {
@@ -112,6 +175,22 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
 
     @objc private func formatChanged() {
         prefs.imageFormat = ImageFormat.allCases[formatPopup.indexOfSelectedItem]
+    }
+
+    @objc private func modeChanged() {
+        prefs.recordingMode = RecordingMode.allCases[modePopup.indexOfSelectedItem]
+    }
+
+    @objc private func audioChanged() {
+        prefs.audioSource = AudioSource.allCases[audioPopup.indexOfSelectedItem]
+    }
+
+    @objc private func toggleCursor() {
+        prefs.recordingShowsCursor = cursorCheck.state == .on
+    }
+
+    @objc private func toggleAskRecording() {
+        prefs.askWhereToSaveRecording = askRecordingCheck.state == .on
     }
 
     @objc private func toggleCopyAfterSave() {

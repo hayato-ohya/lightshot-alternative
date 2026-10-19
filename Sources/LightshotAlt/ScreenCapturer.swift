@@ -27,6 +27,20 @@ enum CaptureError: LocalizedError {
 enum ScreenCapturer {
     static var hasPermission: Bool { CGPreflightScreenCaptureAccess() }
 
+    /// Finds the SCDisplay for an NSScreen by display ID, falling back to matching by size.
+    static func display(for screen: NSScreen, in content: SCShareableContent, used: inout Set<CGDirectDisplayID>) -> SCDisplay? {
+        let number = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
+        let matched = content.displays.first(where: { $0.displayID == number })
+            ?? content.displays.first(where: { !used.contains($0.displayID)
+                && $0.width == Int(screen.frame.width) && $0.height == Int(screen.frame.height) })
+        guard let display = matched else {
+            NSLog("No SCDisplay for screen %@ (id %@)", screen.localizedName, String(describing: number))
+            return nil
+        }
+        used.insert(display.displayID)
+        return display
+    }
+
     static func requestPermission() {
         CGRequestScreenCaptureAccess()
     }
@@ -47,15 +61,7 @@ enum ScreenCapturer {
         var shots: [ScreenShot] = []
         var usedDisplayIDs = Set<CGDirectDisplayID>()
         for screen in NSScreen.screens {
-            let number = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
-            let matched = content.displays.first(where: { $0.displayID == number })
-                ?? content.displays.first(where: { !usedDisplayIDs.contains($0.displayID)
-                    && $0.width == Int(screen.frame.width) && $0.height == Int(screen.frame.height) })
-            guard let display = matched else {
-                NSLog("No SCDisplay for screen %@ (id %@)", screen.localizedName, String(describing: number))
-                continue
-            }
-            usedDisplayIDs.insert(display.displayID)
+            guard let display = display(for: screen, in: content, used: &usedDisplayIDs) else { continue }
 
             let filter: SCContentFilter
             if let selfApp {
