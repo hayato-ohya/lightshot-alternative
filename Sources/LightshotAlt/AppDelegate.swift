@@ -6,7 +6,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private var captureMenuItem: NSMenuItem!
     private var recordMenuItem: NSMenuItem!
-    private var modeItems: [RecordingMode: NSMenuItem] = [:]
     private var audioItems: [AudioSource: NSMenuItem] = [:]
     private var cursorItem: NSMenuItem!
     private var session: CaptureSession?
@@ -14,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var capturing = false
 
     private var recorder: ScreenRecorder?
+    private var dimWindow: RecordingDimWindow?
     private var recordingTimer: Timer?
     private var startingRecording = false
     private var stoppingRecording = false
@@ -71,14 +71,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(recordMenuItem)
 
         let options = NSMenu(title: "Recording Options")
-        for mode in RecordingMode.allCases {
-            let item = NSMenuItem(title: mode.title, action: #selector(selectMode(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = mode.rawValue
-            options.addItem(item)
-            modeItems[mode] = item
-        }
-        options.addItem(.separator())
         for source in AudioSource.allCases {
             let item = NSMenuItem(title: source.title, action: #selector(selectAudioSource(_:)), keyEquivalent: "")
             item.target = self
@@ -112,7 +104,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let prefs = Preferences.shared
         captureMenuItem.title = "Take Screenshot  (\(prefs.hotKey.displayString))"
         recordMenuItem.title = (recorder != nil ? "Stop Recording" : "Start Recording") + "  (\(prefs.recordingHotKey.displayString))"
-        for (mode, item) in modeItems { item.state = mode == prefs.recordingMode ? .on : .off }
         for (source, item) in audioItems { item.state = source == prefs.audioSource ? .on : .off }
         cursorItem.state = prefs.recordingShowsCursor ? .on : .off
     }
@@ -247,36 +238,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
         let options = Preferences.shared.recordingOptions
-        if options.mode == .audio {
-            beginRecording(options: options, screen: nil, rect: nil)
-        } else {
-            beginOverlay(mode: .recording) { [weak self] screen, rect in
-                self?.beginRecording(options: options, screen: screen, rect: rect)
-            }
+        beginOverlay(mode: .recording) { [weak self] screen, rect in
+            self?.beginRecording(options: options, screen: screen, rect: rect)
         }
     }
 
     private func recordingURL(for options: RecordingOptions) -> URL {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
-        let name = (options.mode == .screen ? "Screen Recording " : "Audio Recording ") + f.string(from: Date())
-        let ext = options.mode == .screen ? "mp4" : "m4a"
+        let name = "Screen Recording " + f.string(from: Date())
+        let ext = "mp4"
         let directory = Preferences.shared.askWhereToSaveRecording
             ? FileManager.default.temporaryDirectory
             : Preferences.shared.saveDirectory
         return directory.appendingPathComponent(name).appendingPathExtension(ext)
     }
 
-    private func beginRecording(options: RecordingOptions, screen: NSScreen?, rect: CGRect?) {
+    private func beginRecording(options: RecordingOptions, screen: NSScreen, rect: CGRect) {
         guard recorder == nil, !startingRecording else { return }
         startingRecording = true
         let recorder = ScreenRecorder(options: options, outputURL: recordingURL(for: options))
         Task { @MainActor [self] in
             defer { startingRecording = false }
             do {
-                Log.write("recording: starting \(options) screen=\(screen?.localizedName ?? "-") rect=\(rect.map { NSStringFromRect($0) } ?? "-")")
+                Log.write("recording: starting \(options) screen=\(screen.localizedName) rect=\(NSStringFromRect(rect))")
                 try await recorder.start(screen: screen, rect: rect)
                 self.recorder = recorder
+                dimWindow = RecordingDimWindow(screen: screen, rect: rect)
+                dimWindow?.orderFrontRegardless()
                 recorder.onStreamStopped = { [weak self] error in
                     Log.write("recording: stream stopped with error \(String(describing: error))")
                     self?.stopRecording()
@@ -301,6 +290,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         recordingTimer?.invalidate()
         recordingTimer = nil
         self.recorder = nil
+        dimWindow?.close()
+        dimWindow = nil
         showIdleStatusIcon()
         Task { @MainActor [self] in
             defer { stoppingRecording = false }
@@ -342,12 +333,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    @objc private func selectMode(_ sender: NSMenuItem) {
-        if let raw = sender.representedObject as? String, let mode = RecordingMode(rawValue: raw) {
-            Preferences.shared.recordingMode = mode
-        }
-    }
-
     @objc private func selectAudioSource(_ sender: NSMenuItem) {
         if let raw = sender.representedObject as? String, let source = AudioSource(rawValue: raw) {
             Preferences.shared.audioSource = source
@@ -370,10 +355,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func runRecordingSelfTest(seconds: Int) {
         let args = CommandLine.arguments
-        let mode: RecordingMode = args.contains("--audio-only") ? .audio : .screen
         let source = args.firstIndex(of: "--audio").flatMap { i in i + 1 < args.count ? AudioSource(rawValue: args[i + 1]) : nil } ?? .system
-        let options = RecordingOptions(mode: mode, audioSource: source, showCursor: true)
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("selftest.\(mode == .screen ? "mp4" : "m4a")")
+        let options = RecordingOptions(audioSource: source, showCursor: true)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("selftest.mp4")
         let recorder = ScreenRecorder(options: options, outputURL: url)
         Task { @MainActor in
             do {

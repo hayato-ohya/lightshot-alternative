@@ -73,7 +73,6 @@ final class Preferences {
         static let copyAfterSave = "copyAfterSave"
         static let recordKeyCode = "recordHotKeyCode"
         static let recordModifiers = "recordHotKeyModifiers"
-        static let recordingMode = "recordingMode"
         static let audioSource = "recordingAudioSource"
         static let showCursor = "recordingShowsCursor"
         static let askWhereToSaveRecording = "askWhereToSaveRecording"
@@ -105,11 +104,6 @@ final class Preferences {
         }
     }
 
-    var recordingMode: RecordingMode {
-        get { RecordingMode(rawValue: defaults.string(forKey: Key.recordingMode) ?? "") ?? .screen }
-        set { defaults.set(newValue.rawValue, forKey: Key.recordingMode) }
-    }
-
     var audioSource: AudioSource {
         get { AudioSource(rawValue: defaults.string(forKey: Key.audioSource) ?? "") ?? .both }
         set { defaults.set(newValue.rawValue, forKey: Key.audioSource) }
@@ -126,7 +120,7 @@ final class Preferences {
     }
 
     var recordingOptions: RecordingOptions {
-        RecordingOptions(mode: recordingMode, audioSource: audioSource, showCursor: recordingShowsCursor)
+        RecordingOptions(audioSource: audioSource, showCursor: recordingShowsCursor)
     }
 
     var saveDirectory: URL {

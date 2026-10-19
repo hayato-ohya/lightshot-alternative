@@ -9,7 +9,6 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
     private var formatPopup: NSPopUpButton!
     private var copyAfterSaveCheck: NSButton!
     private var loginCheck: NSButton!
-    private var modePopup: NSPopUpButton!
     private var audioPopup: NSPopUpButton!
     private var cursorCheck: NSButton!
     private var askRecordingCheck: NSButton!
@@ -75,12 +74,6 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         let recordHotKeyRow = NSStackView(views: [recordRecorder, resetRecordButton])
         recordHotKeyRow.spacing = 8
 
-        modePopup = NSPopUpButton(frame: .zero, pullsDown: false)
-        for m in RecordingMode.allCases { modePopup.addItem(withTitle: m.title) }
-        modePopup.selectItem(at: RecordingMode.allCases.firstIndex(of: prefs.recordingMode) ?? 0)
-        modePopup.target = self
-        modePopup.action = #selector(modeChanged)
-
         audioPopup = NSPopUpButton(frame: .zero, pullsDown: false)
         for s in AudioSource.allCases { audioPopup.addItem(withTitle: s.title) }
         audioPopup.selectItem(at: AudioSource.allCases.firstIndex(of: prefs.audioSource) ?? 0)
@@ -103,7 +96,6 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
             [NSGridCell.emptyContentView, copyAfterSaveCheck],
             [NSGridCell.emptyContentView, header("Recording")],
             [label("Shortcut:"), recordHotKeyRow],
-            [label("Mode:"), modePopup],
             [label("Audio:"), audioPopup],
             [NSGridCell.emptyContentView, cursorCheck],
             [NSGridCell.emptyContentView, askRecordingCheck],
@@ -141,7 +133,6 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         recorder.hotKey = prefs.hotKey
         recordRecorder.hotKey = prefs.recordingHotKey
         pathLabel.stringValue = prefs.saveDirectory.path
-        modePopup.selectItem(at: RecordingMode.allCases.firstIndex(of: prefs.recordingMode) ?? 0)
         audioPopup.selectItem(at: AudioSource.allCases.firstIndex(of: prefs.audioSource) ?? 0)
         cursorCheck.state = prefs.recordingShowsCursor ? .on : .off
         NSApp.activate(ignoringOtherApps: true)
@@ -175,10 +166,6 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
 
     @objc private func formatChanged() {
         prefs.imageFormat = ImageFormat.allCases[formatPopup.indexOfSelectedItem]
-    }
-
-    @objc private func modeChanged() {
-        prefs.recordingMode = RecordingMode.allCases[modePopup.indexOfSelectedItem]
     }
 
     @objc private func audioChanged() {

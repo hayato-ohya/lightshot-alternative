@@ -19,9 +19,9 @@ No Rosetta 2, no third-party dependencies: just Swift, AppKit and ScreenCaptureK
 - Multi-display support, exports at native Retina resolution
 - Preferences: hot key, save folder, image format, copy-after-save, launch at login
 - **Screen recording** with a second hot key (default **⇧⌘0**): select an area the same way, press ↩ to start, press the hot key again or click the red timer in the menu bar to stop. Saved as .mp4 (H.264 + AAC) in the save folder
-  - Mode: screen + audio, or audio only (.m4a)
   - Audio: system audio, microphone, both mixed together, or mute
   - Show or hide the cursor; optionally ask where to save each recording
+  - While recording, everything outside the recorded area is dimmed (the dimming is not captured)
   - Options are in Preferences and in the menu bar under "Recording Options"
 
 ### Requirements
@@ -75,7 +75,7 @@ Recording with the microphone additionally asks for Microphone access the first 
 3. Annotate with the toolbar on the right; the color button opens color, line width and text size
 4. Click Copy or Save in the bar below, or press ⌘C / ⌘S
 
-To record: press ⇧⌘0, select the area, press ↩. The menu bar shows a red dot with the elapsed time; press ⇧⌘0 again (or choose Stop Recording) to finish. In Audio Only mode the recording starts immediately.
+To record: press ⇧⌘0, select the area, press ↩. The menu bar shows a red dot with the elapsed time; press ⇧⌘0 again (or choose Stop Recording) to finish.
 
 ### Troubleshooting
 
@@ -98,6 +98,7 @@ defaults delete com.hayato.lightshot-alternative debugLogging             # disa
 | `Sources/LightshotAlt/Annotation.swift` | Annotation drawing |
 | `Sources/LightshotAlt/ScreenRecorder.swift` | Screen / audio recording with SCStream and AVAssetWriter |
 | `Sources/LightshotAlt/AudioPipeline.swift` | Converts and mixes system audio and microphone |
+| `Sources/LightshotAlt/RecordingDimWindow.swift` | Click-through overlay that dims everything outside the recorded area |
 | `Sources/LightshotAlt/PreferencesWindowController.swift` | Preferences window |
 | `scripts/generate-icon.swift` | Generates the app icon and the menu bar icon |
 | `scripts/make-signing-cert.sh` | Creates the self-signed signing certificate |
@@ -124,9 +125,9 @@ Rosetta 2 に依存せず、Swift + AppKit + ScreenCaptureKit だけで作られ
 - マルチディスプレイ対応、Retina 解像度で書き出し
 - 設定: ホットキー、保存先フォルダ、画像形式、保存時にコピーも行う、ログイン時に起動
 - **画面録画**（既定ホットキー **⇧⌘0**）: 同じ操作で範囲を選び ↩ で開始、もう一度ホットキーを押すかメニューバーの赤いタイマーをクリックで停止。保存先フォルダに .mp4（H.264 + AAC）で保存
-  - モード: 画面＋音声 / 音声のみ（.m4a）
   - 音源: システム音声 / マイク / システム音声＋マイク（ミックス） / ミュート
   - カーソルの表示・非表示、録画ごとに保存先を尋ねるかどうか
+  - 録画中は録画範囲以外が暗く表示されます（暗転は録画には映りません）
   - オプションは設定画面とメニューバーの「Recording Options」の両方から変更可能
 
 ### 必要環境
@@ -182,7 +183,7 @@ xattr -dr com.apple.quarantine "/Applications/Lightshot Alternative.app"
 3. 右側のツールバーで注釈を描く。色ボタンから色・線幅・文字サイズを変更
 4. 下のバーの「コピー」または「保存」、もしくは ⌘C / ⌘S
 
-録画は ⇧⌘0 → 範囲を選択 → ↩ で開始。メニューバーに赤い●と経過時間が表示され、もう一度 ⇧⌘0（または Stop Recording）で終了します。「音声のみ」モードでは即座に録音が始まります。
+録画は ⇧⌘0 → 範囲を選択 → ↩ で開始。メニューバーに赤い●と経過時間が表示され、もう一度 ⇧⌘0（または Stop Recording）で終了します。
 
 ### トラブルシューティング
 
@@ -205,6 +206,7 @@ defaults delete com.hayato.lightshot-alternative debugLogging             # 無�
 | `Sources/LightshotAlt/Annotation.swift` | 注釈の描画 |
 | `Sources/LightshotAlt/ScreenRecorder.swift` | SCStream と AVAssetWriter による画面・音声の録画 |
 | `Sources/LightshotAlt/AudioPipeline.swift` | システム音声とマイクの変換・ミックス |
+| `Sources/LightshotAlt/RecordingDimWindow.swift` | 録画範囲以外を暗くするクリック透過オーバーレイ |
 | `Sources/LightshotAlt/PreferencesWindowController.swift` | 設定画面 |
 | `scripts/generate-icon.swift` | アプリアイコンとメニューバーアイコンの生成 |
 | `scripts/make-signing-cert.sh` | 自己署名の署名証明書の作成 |

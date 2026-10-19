@@ -2,11 +2,6 @@ import AVFoundation
 import AppKit
 import ScreenCaptureKit
 
-enum RecordingMode: String, CaseIterable {
-    case screen, audio
-    var title: String { self == .screen ? "Screen + Audio" : "Audio Only" }
-}
-
 enum AudioSource: String, CaseIterable {
     case system, microphone, both, mute
     var title: String {
@@ -22,14 +17,12 @@ enum AudioSource: String, CaseIterable {
 }
 
 struct RecordingOptions {
-    var mode: RecordingMode
     var audioSource: AudioSource
     var showCursor: Bool
 }
 
 enum RecordingError: LocalizedError {
     case microphoneDenied
-    case nothingToRecord
     case displayNotFound
     case writer(String)
     case notRecording
@@ -38,7 +31,6 @@ enum RecordingError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .microphoneDenied: return "Microphone access is required for this audio source. Enable it in System Settings → Privacy & Security → Microphone."
-        case .nothingToRecord: return "Audio Only mode with audio muted has nothing to record."
         case .displayNotFound: return "The display to record could not be found."
         case .writer(let s): return "Could not write the recording: \(s)"
         case .notRecording: return "No recording is in progress."
@@ -68,17 +60,16 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
         self.outputURL = outputURL
     }
 
-    /// `rect` is in points, relative to the top-left corner of `screen` (ignored in audio-only mode).
+    /// `rect` is in points, relative to the top-left corner of `screen`.
     @MainActor
-    func start(screen: NSScreen?, rect: CGRect?) async throws {
-        if options.mode == .audio && options.audioSource == .mute { throw RecordingError.nothingToRecord }
+    func start(screen: NSScreen, rect: CGRect) async throws {
         if options.audioSource.usesMicrophone {
             let granted = await AVCaptureDevice.requestAccess(for: .audio)
             guard granted else { throw RecordingError.microphoneDenied }
         }
 
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-        let targetScreen = screen ?? NSScreen.main ?? NSScreen.screens[0]
+        let targetScreen = screen
         var used = Set<CGDirectDisplayID>()
         guard let display = ScreenCapturer.display(for: targetScreen, in: content, used: &used) else {
             throw RecordingError.displayNotFound
@@ -92,10 +83,10 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
         }
 
         let config = SCStreamConfiguration()
+        let scale = targetScreen.backingScaleFactor
+        let region = rect.standardized
         var videoSize = CGSize.zero
-        if options.mode == .screen {
-            let scale = targetScreen.backingScaleFactor
-            let region = (rect ?? CGRect(origin: .zero, size: targetScreen.frame.size)).standardized
+        do {
             // H.264 needs even dimensions.
             let w = max(2, Int(region.width * scale) & ~1)
             let h = max(2, Int(region.height * scale) & ~1)
@@ -107,11 +98,6 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
             config.pixelFormat = kCVPixelFormatType_32BGRA
             config.queueDepth = 6
             videoSize = CGSize(width: w, height: h)
-        } else {
-            // A tiny, slow video stream that is never consumed: ScreenCaptureKit still needs one to deliver audio.
-            config.width = 64
-            config.height = 64
-            config.minimumFrameInterval = CMTime(value: 1, timescale: 1)
         }
         config.capturesAudio = options.audioSource.usesSystemAudio
         config.excludesCurrentProcessAudio = true
@@ -120,8 +106,8 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
         config.captureMicrophone = options.audioSource.usesMicrophone
 
         try? FileManager.default.removeItem(at: outputURL)
-        let writer = try AVAssetWriter(outputURL: outputURL, fileType: options.mode == .screen ? .mp4 : .m4a)
-        if options.mode == .screen {
+        let writer = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
+        do {
             let pixels = Double(videoSize.width * videoSize.height)
             let settings: [String: Any] = [
                 AVVideoCodecKey: AVVideoCodecType.h264,
@@ -158,9 +144,7 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
         self.writer = writer
 
         let stream = SCStream(filter: filter, configuration: config, delegate: self)
-        if options.mode == .screen {
-            try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)
-        }
+        try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)
         if options.audioSource.usesSystemAudio {
             try stream.addStreamOutput(self, type: .audio, sampleHandlerQueue: queue)
         }
@@ -253,8 +237,7 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
 
     private func appendAudio(_ sampleBuffer: CMSampleBuffer) {
         guard let audioInput else { return }
-        // In screen mode the session starts on the first video frame so the video is not preceded by silence.
-        if options.mode == .audio { beginSessionIfNeeded(at: sampleBuffer.presentationTimeStamp) }
+        // The session starts on the first video frame, so audio that arrives earlier is dropped.
         append(sampleBuffer, to: audioInput)
     }
 
