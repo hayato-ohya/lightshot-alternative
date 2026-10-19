@@ -25,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             switch id {
             case .screenshot: self?.startCapture()
             case .recording: self?.toggleRecording()
+            case .stopRecording: self?.stopRecording()
             }
         }
         HotKeyManager.shared.onRegistrationFailed = { [weak self] id, hk, status in self?.showHotKeyFailure(id, hk, status: status) }
@@ -266,6 +267,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self.recorder = recorder
                 dimWindow = RecordingDimWindow(screen: screen, rect: rect)
                 dimWindow?.orderFrontRegardless()
+                // Esc stops the recording from any app while it is running.
+                HotKeyManager.shared.register(HotKey(keyCode: 53, modifiers: []), for: .stopRecording)
                 recorder.onStreamStopped = { [weak self] error in
                     Log.write("recording: stream stopped with error \(String(describing: error))")
                     self?.stopRecording()
@@ -290,6 +293,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         recordingTimer?.invalidate()
         recordingTimer = nil
         self.recorder = nil
+        HotKeyManager.shared.remove(.stopRecording)
         dimWindow?.close()
         dimWindow = nil
         showIdleStatusIcon()

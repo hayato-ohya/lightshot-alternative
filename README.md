@@ -18,7 +18,7 @@ No Rosetta 2, no third-party dependencies: just Swift, AppKit and ScreenCaptureK
 - **⌘C / Enter** copies to the clipboard, **⌘S** saves (PNG / JPEG), **Esc** cancels
 - Multi-display support, exports at native Retina resolution
 - Preferences: hot key, save folder, image format, copy-after-save, launch at login
-- **Screen recording** with a second hot key (default **⇧⌘0**): select an area the same way, press ↩ to start, press the hot key again or click the red timer in the menu bar to stop. Saved as .mp4 (H.264 + AAC) in the save folder
+- **Screen recording** with a second hot key (default **⇧⌘0**): select an area the same way, press ↩ to start, press the hot key again, press Esc, or click the red timer in the menu bar to stop. Saved as .mp4 (H.264 + AAC) in the save folder
   - Audio: system audio, microphone, both mixed together, or mute
   - Show or hide the cursor; optionally ask where to save each recording
   - While recording, everything outside the recorded area is dimmed (the dimming is not captured)
@@ -75,7 +75,7 @@ Recording with the microphone additionally asks for Microphone access the first 
 3. Annotate with the toolbar on the right; the color button opens color, line width and text size
 4. Click Copy or Save in the bar below, or press ⌘C / ⌘S
 
-To record: press ⇧⌘0, select the area, press ↩. The menu bar shows a red dot with the elapsed time; press ⇧⌘0 again (or choose Stop Recording) to finish.
+To record: press ⇧⌘0, select the area, press ↩. The menu bar shows a red dot with the elapsed time; press ⇧⌘0 again, press Esc, or choose Stop Recording to finish.
 
 ### Troubleshooting
 
@@ -124,7 +124,7 @@ Rosetta 2 に依存せず、Swift + AppKit + ScreenCaptureKit だけで作られ
 - **⌘C / Enter** でクリップボードへコピー、**⌘S** で保存（PNG / JPEG）、**Esc** でキャンセル
 - マルチディスプレイ対応、Retina 解像度で書き出し
 - 設定: ホットキー、保存先フォルダ、画像形式、保存時にコピーも行う、ログイン時に起動
-- **画面録画**（既定ホットキー **⇧⌘0**）: 同じ操作で範囲を選び ↩ で開始、もう一度ホットキーを押すかメニューバーの赤いタイマーをクリックで停止。保存先フォルダに .mp4（H.264 + AAC）で保存
+- **画面録画**（既定ホットキー **⇧⌘0**）: 同じ操作で範囲を選び ↩ で開始、もう一度ホットキーを押すか、Esc、またはメニューバーの赤いタイマーをクリックで停止。保存先フォルダに .mp4（H.264 + AAC）で保存
   - 音源: システム音声 / マイク / システム音声＋マイク（ミックス） / ミュート
   - カーソルの表示・非表示、録画ごとに保存先を尋ねるかどうか
   - 録画中は録画範囲以外が暗く表示されます（暗転は録画には映りません）
@@ -183,7 +183,7 @@ xattr -dr com.apple.quarantine "/Applications/Lightshot Alternative.app"
 3. 右側のツールバーで注釈を描く。色ボタンから色・線幅・文字サイズを変更
 4. 下のバーの「コピー」または「保存」、もしくは ⌘C / ⌘S
 
-録画は ⇧⌘0 → 範囲を選択 → ↩ で開始。メニューバーに赤い●と経過時間が表示され、もう一度 ⇧⌘0（または Stop Recording）で終了します。
+録画は ⇧⌘0 → 範囲を選択 → ↩ で開始。メニューバーに赤い●と経過時間が表示され、もう一度 ⇧⌘0、Esc、または Stop Recording で終了します。
 
 ### トラブルシューティング
 

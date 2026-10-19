@@ -9,6 +9,7 @@ final class HotKeyManager {
     enum ID: UInt32 {
         case screenshot = 1
         case recording = 2
+        case stopRecording = 3
     }
 
     var onPressed: ((ID) -> Void)?
@@ -68,6 +69,12 @@ final class HotKeyManager {
         } else {
             onRegistrationFailed?(id, hotKey, status)
         }
+    }
+
+    /// Unregisters `id` and forgets it, so it is not restored by `resume` or `ensureRegistered`.
+    func remove(_ id: ID) {
+        unregister(id)
+        current[id] = nil
     }
 
     func unregister(_ id: ID) {
