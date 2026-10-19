@@ -29,7 +29,7 @@ final class RenderTests: XCTestCase {
     func testCropMatchesSelectionAtRetinaScale() {
         let scale: CGFloat = 2
         let view = OverlayView(frame: CGRect(x: 0, y: 0, width: 100, height: 80),
-                               screenshot: makeScreenshot(scale: scale), scale: scale, windows: [])
+                               screenshot: makeScreenshot(scale: scale), scale: scale, windowFrames: [])
         // Selection straddling the quadrant boundary: 40..60 x 30..50 points.
         view.selection = CGRect(x: 40, y: 30, width: 20, height: 20)
         let image = view.renderImage()!
@@ -45,7 +45,7 @@ final class RenderTests: XCTestCase {
     func testAnnotationIsDrawnAtCorrectPositionAndScale() {
         let scale: CGFloat = 2
         let view = OverlayView(frame: CGRect(x: 0, y: 0, width: 100, height: 80),
-                               screenshot: makeScreenshot(scale: scale), scale: scale, windows: [])
+                               screenshot: makeScreenshot(scale: scale), scale: scale, windowFrames: [])
         view.selection = CGRect(x: 50, y: 40, width: 50, height: 40) // bottom-right quadrant, blue
         // Green filled-ish rectangle stroke at view points (60,45)-(70,55) → crop points (10,5)-(20,15).
         view.annotations = [Annotation(shape: .rect(CGRect(x: 60, y: 45, width: 10, height: 10)),
@@ -67,7 +67,7 @@ final class RenderTests: XCTestCase {
     func testMarkerOpacityIsUniformWhereStrokeOverlapsItself() {
         let scale: CGFloat = 1
         let view = OverlayView(frame: CGRect(x: 0, y: 0, width: 100, height: 80),
-                               screenshot: makeScreenshot(scale: scale), scale: scale, windows: [])
+                               screenshot: makeScreenshot(scale: scale), scale: scale, windowFrames: [])
         view.selection = CGRect(x: 50, y: 40, width: 50, height: 40) // blue area
         // Marker stroke that goes right, then doubles back over itself with a jitter.
         let pts = [CGPoint(x: 55, y: 60), CGPoint(x: 90, y: 60), CGPoint(x: 70, y: 61), CGPoint(x: 72, y: 59), CGPoint(x: 60, y: 60)]
@@ -81,7 +81,7 @@ final class RenderTests: XCTestCase {
 
     func testRecordingModeOverlaySurvivesSelectionReset() {
         let view = OverlayView(frame: CGRect(x: 0, y: 0, width: 100, height: 80),
-                               screenshot: makeScreenshot(scale: 1), scale: 1, windows: [], mode: .recording)
+                               screenshot: makeScreenshot(scale: 1), scale: 1, windowFrames: [], mode: .recording)
         view.selection = CGRect(x: 10, y: 10, width: 20, height: 20)
         view.clearSelection() // used to crash: no color button exists in recording mode
         XCTAssertNil(view.selection)

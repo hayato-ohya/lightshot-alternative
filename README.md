@@ -18,7 +18,6 @@ No Rosetta 2, no third-party dependencies: just Swift, AppKit and ScreenCaptureK
 - **⌘C / Enter** copies to the clipboard, **⌘S** saves (PNG / JPEG), **Esc** cancels
 - Multi-display support, exports at native Retina resolution
 - Preferences: hot key, save folder, image format, copy-after-save, launch at login
-- **Full web page capture** (default **⇧⌘8**): click a Safari or Chromium (Chrome, Edge, Brave, Arc, Vivaldi, Opera) window and the whole page, including the part below the fold, is captured by scrolling and stitching. A preview window offers Copy (⌘C) and Save (⌘S)
 - **Screen recording** with a second hot key (default **⇧⌘0**): select an area the same way, press ↩ to start, press the hot key again, press Esc, or click the red timer in the menu bar to stop. Saved as .mp4 (H.264 + AAC) in the save folder
   - Audio: system audio, microphone, both mixed together, or mute
   - Show or hide the cursor; optionally ask where to save each recording
@@ -68,15 +67,6 @@ The first capture asks for Screen Recording access. Enable "Lightshot Alternativ
 
 Recording with the microphone additionally asks for Microphone access the first time.
 
-#### Full web page capture
-
-The app scrolls the page by sending JavaScript to the browser via Apple Events, so two things must be allowed once:
-
-- macOS asks for **Automation** permission the first time (System Settings → Privacy & Security → Automation).
-- JavaScript from Apple Events must be enabled in the browser: Safari → Develop menu → **Allow JavaScript from Apple Events** (turn on the Develop menu in Safari → Settings → Advanced); Chrome → View → Developer → **Allow JavaScript from Apple Events**.
-
-Fixed headers and footers are detected and kept only once. Pages that scroll inside an inner element, horizontal scrolling and infinite-scroll content below the initial page height are not supported.
-
 "Launch at login" only works when the app runs from the .app bundle in `/Applications`.
 
 ### Usage
@@ -85,8 +75,6 @@ Fixed headers and footers are detected and kept only once. Pages that scroll ins
 2. Drag to select an area (or click a window)
 3. Annotate with the toolbar on the right; the color button opens color, line width and text size
 4. Click Copy or Save in the bar below, or press ⌘C / ⌘S
-
-To capture a whole web page: press ⇧⌘8 and click the browser window; the menu bar shows the progress, then a preview window opens.
 
 To record: press ⇧⌘0, select the area, press ↩. The menu bar shows a red dot with the elapsed time; press ⇧⌘0 again, press Esc, or choose Stop Recording to finish.
 
@@ -112,8 +100,6 @@ defaults delete com.hayato.lightshot-alternative debugLogging             # disa
 | `Sources/LightshotAlt/ScreenRecorder.swift` | Screen / audio recording with SCStream and AVAssetWriter |
 | `Sources/LightshotAlt/AudioPipeline.swift` | Converts and mixes system audio and microphone |
 | `Sources/LightshotAlt/RecordingDimWindow.swift` | Click-through overlay that dims everything outside the recorded area |
-| `Sources/LightshotAlt/FullPageCapturer.swift` | Scrolls a browser window via AppleScript/JavaScript and stitches the captures |
-| `Sources/LightshotAlt/FullPagePreviewWindow.swift` | Preview window for full-page captures |
 | `Sources/LightshotAlt/PreferencesWindowController.swift` | Preferences window |
 | `scripts/generate-icon.swift` | Generates the app icon and the menu bar icon |
 | `scripts/make-signing-cert.sh` | Creates the self-signed signing certificate |
@@ -139,7 +125,6 @@ Rosetta 2 に依存せず、Swift + AppKit + ScreenCaptureKit だけで作られ
 - **⌘C / Enter** でクリップボードへコピー、**⌘S** で保存（PNG / JPEG）、**Esc** でキャンセル
 - マルチディスプレイ対応、Retina 解像度で書き出し
 - 設定: ホットキー、保存先フォルダ、画像形式、保存時にコピーも行う、ログイン時に起動
-- **Web ページ全体のスクリーンショット**（既定 **⇧⌘8**）: Safari または Chromium 系（Chrome, Edge, Brave, Arc, Vivaldi, Opera）のウィンドウをクリックすると、スクロールしないと見えない部分も含めてページ全体を撮影・結合します。プレビューから ⌘C コピー / ⌘S 保存
 - **画面録画**（既定ホットキー **⇧⌘0**）: 同じ操作で範囲を選び ↩ で開始、もう一度ホットキーを押すか、Esc、またはメニューバーの赤いタイマーをクリックで停止。保存先フォルダに .mp4（H.264 + AAC）で保存
   - 音源: システム音声 / マイク / システム音声＋マイク（ミックス） / ミュート
   - カーソルの表示・非表示、録画ごとに保存先を尋ねるかどうか
@@ -191,15 +176,6 @@ xattr -dr com.apple.quarantine "/Applications/Lightshot Alternative.app"
 
 マイクを使う録画では、初回にマイクの許可も求められます。
 
-#### Web ページ全体の撮影
-
-Apple Events 経由でブラウザに JavaScript を送ってページをスクロールするため、次の2つを一度だけ許可してください。
-
-- 初回に macOS の **オートメーション** 権限を求められます（システム設定 → プライバシーとセキュリティ → オートメーション）。
-- ブラウザ側で Apple Events からの JavaScript を許可: Safari → 開発メニュー → **Apple Events からの JavaScript を許可**（開発メニューは Safari → 設定 → 詳細 で表示）。Chrome → 表示 → 開発/管理 → **Apple Events からの JavaScript を許可**。
-
-固定ヘッダー・フッターは検出して1回だけ写るようにします。ページ内の要素がスクロールする構造のページ、横スクロール、撮影開始時点より下に読み込まれる無限スクロールの内容は対象外です。
-
 「ログイン時に起動」は `/Applications` に入れた .app から起動している場合のみ機能します。
 
 ### 使い方
@@ -208,8 +184,6 @@ Apple Events 経由でブラウザに JavaScript を送ってページをスク�
 2. ドラッグで範囲を選択（ウィンドウをクリックでも可）
 3. 右側のツールバーで注釈を描く。色ボタンから色・線幅・文字サイズを変更
 4. 下のバーの「コピー」または「保存」、もしくは ⌘C / ⌘S
-
-Web ページ全体を撮るには ⇧⌘8 を押してブラウザのウィンドウをクリックします。メニューバーに進捗が表示され、終わるとプレビューが開きます。
 
 録画は ⇧⌘0 → 範囲を選択 → ↩ で開始。メニューバーに赤い●と経過時間が表示され、もう一度 ⇧⌘0、Esc、または Stop Recording で終了します。
 
@@ -235,8 +209,6 @@ defaults delete com.hayato.lightshot-alternative debugLogging             # 無�
 | `Sources/LightshotAlt/ScreenRecorder.swift` | SCStream と AVAssetWriter による画面・音声の録画 |
 | `Sources/LightshotAlt/AudioPipeline.swift` | システム音声とマイクの変換・ミックス |
 | `Sources/LightshotAlt/RecordingDimWindow.swift` | 録画範囲以外を暗くするクリック透過オーバーレイ |
-| `Sources/LightshotAlt/FullPageCapturer.swift` | AppleScript/JavaScript でブラウザをスクロールし撮影を結合 |
-| `Sources/LightshotAlt/FullPagePreviewWindow.swift` | ページ全体撮影のプレビューウィンドウ |
 | `Sources/LightshotAlt/PreferencesWindowController.swift` | 設定画面 |
 | `scripts/generate-icon.swift` | アプリアイコンとメニューバーアイコンの生成 |
 | `scripts/make-signing-cert.sh` | 自己署名の署名証明書の作成 |

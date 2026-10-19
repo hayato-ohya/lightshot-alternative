@@ -16,8 +16,6 @@ final class CaptureSession: OverlayViewDelegate {
     var onFinish: (() -> Void)?
     /// Recording mode only: the user confirmed a region (points, relative to the screen's top-left).
     var onStartRecording: ((NSScreen, CGRect) -> Void)?
-    /// Window-pick mode only: the user clicked a window.
-    var onPickWindow: ((WindowInfo) -> Void)?
     private var finished = false
 
     init(result: CaptureResult, mode: OverlayView.Mode = .screenshot) {
@@ -26,11 +24,11 @@ final class CaptureSession: OverlayViewDelegate {
         for shot in result.shots {
             let screenFrame = shot.screen.frame
             // Convert global top-left-origin window frames into this screen's flipped local coords.
-            let localWindows = result.windows.map { w in
-                w.with(frame: CGRect(x: w.frame.minX - screenFrame.minX,
-                                     y: w.frame.minY - (primaryHeight - screenFrame.maxY),
-                                     width: w.frame.width, height: w.frame.height))
-            }.filter { $0.frame.intersects(CGRect(origin: .zero, size: screenFrame.size)) }
+            let localFrames = result.windowFrames.map { r in
+                CGRect(x: r.minX - screenFrame.minX,
+                       y: r.minY - (primaryHeight - screenFrame.maxY),
+                       width: r.width, height: r.height)
+            }.filter { $0.intersects(CGRect(origin: .zero, size: screenFrame.size)) }
 
             // Note: the `screen:` initializer treats contentRect as screen-relative, which misplaces
             // windows on displays whose origin is not (0,0). Use global coordinates instead.
@@ -54,7 +52,7 @@ final class CaptureSession: OverlayViewDelegate {
             container.addSubview(imageView)
 
             let overlay = OverlayView(frame: container.bounds, screenshot: shot.image,
-                                      scale: shot.screen.backingScaleFactor, windows: localWindows, mode: mode)
+                                      scale: shot.screen.backingScaleFactor, windowFrames: localFrames, mode: mode)
             overlay.autoresizingMask = [.width, .height]
             overlay.delegate = self
             container.addSubview(overlay)
@@ -143,11 +141,6 @@ final class CaptureSession: OverlayViewDelegate {
 
     func overlayViewDidRequestCancel(_ view: OverlayView) {
         finish()
-    }
-
-    func overlayView(_ view: OverlayView, pickedWindow window: WindowInfo) {
-        finish()
-        onPickWindow?(window)
     }
 
     func overlayView(_ view: OverlayView, startRecording rect: CGRect) {

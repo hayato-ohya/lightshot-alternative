@@ -6,9 +6,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private var captureMenuItem: NSMenuItem!
     private var recordMenuItem: NSMenuItem!
-    private var fullPageMenuItem: NSMenuItem!
-    private var fullPageWindows: [FullPagePreviewWindow] = []
-    private var capturingFullPage = false
     private var session: CaptureSession?
     private var preferencesController: PreferencesWindowController?
     private var capturing = false
@@ -27,7 +24,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             case .screenshot: self?.startCapture()
             case .recording: self?.toggleRecording()
             case .stopRecording: self?.stopRecording()
-            case .fullPage: self?.startFullPageCapture()
             }
         }
         HotKeyManager.shared.onRegistrationFailed = { [weak self] id, hk, status in self?.showHotKeyFailure(id, hk, status: status) }
@@ -72,9 +68,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         recordMenuItem = NSMenuItem(title: "Start Recording", action: #selector(toggleRecordingFromMenu), keyEquivalent: "")
         recordMenuItem.target = self
         menu.addItem(recordMenuItem)
-        fullPageMenuItem = NSMenuItem(title: "Capture Full Web Page", action: #selector(fullPageFromMenu), keyEquivalent: "")
-        fullPageMenuItem.target = self
-        menu.addItem(fullPageMenuItem)
 
         menu.addItem(.separator())
         let prefsItem = NSMenuItem(title: "Preferences…", action: #selector(showPreferences), keyEquivalent: ",")
@@ -94,7 +87,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let prefs = Preferences.shared
         captureMenuItem.title = "Take Screenshot  (\(prefs.hotKey.displayString))"
         recordMenuItem.title = (recorder != nil ? "Stop Recording" : "Start Recording") + "  (\(prefs.recordingHotKey.displayString))"
-        fullPageMenuItem.title = "Capture Full Web Page  (\(prefs.fullPageHotKey.displayString))"
     }
 
     private func showIdleStatusIcon() {
@@ -130,7 +122,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let prefs = Preferences.shared
         HotKeyManager.shared.register(prefs.hotKey, for: .screenshot)
         HotKeyManager.shared.register(prefs.recordingHotKey, for: .recording)
-        HotKeyManager.shared.register(prefs.fullPageHotKey, for: .fullPage)
     }
 
     private func showHotKeyFailure(_ id: HotKeyManager.ID, _ hk: HotKey, status: OSStatus) {
@@ -207,64 +198,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if alert.runModal() == .alertFirstButtonReturn,
            let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
             NSWorkspace.shared.open(url)
-        }
-    }
-
-    // MARK: - Full page
-
-    @objc private func fullPageFromMenu() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in self?.startFullPageCapture() }
-    }
-
-    func startFullPageCapture() {
-        guard session == nil, !capturing, !capturingFullPage, recorder == nil else { return }
-        guard ScreenCapturer.hasPermission else {
-            ScreenCapturer.requestPermission()
-            showPermissionAlert()
-            return
-        }
-        beginOverlay(mode: .windowPick) { _ in }
-        session?.onPickWindow = { [weak self] window in self?.captureFullPage(of: window) }
-    }
-
-    private func captureFullPage(of window: WindowInfo) {
-        let capturer: FullPageCapturer
-        do {
-            capturer = try FullPageCapturer(window: window)
-        } catch {
-            NSApp.activate(ignoringOtherApps: true)
-            NSAlert(error: error).runModal()
-            return
-        }
-        capturingFullPage = true
-        capturer.onProgress = { [weak self] done, total in
-            self?.statusItem.button?.title = " \(done)/\(total)"
-            self?.statusItem.button?.imagePosition = .imageLeading
-        }
-        Task { @MainActor [self] in
-            defer {
-                capturingFullPage = false
-                showIdleStatusIcon()
-            }
-            do {
-                Log.write("fullpage: capturing \(window.appName) \"\(window.title)\"")
-                let image = try await capturer.capture()
-                Log.write("fullpage: done \(image.width)x\(image.height)")
-                let scale = NSScreen.main?.backingScaleFactor ?? 2
-                let preview = FullPagePreviewWindow(image: image, title: window.title, scale: scale)
-                fullPageWindows.append(preview)
-                NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: preview, queue: .main) { [weak self] note in
-                    MainActor.assumeIsolated { self?.fullPageWindows.removeAll { $0 === note.object as? NSWindow } }
-                }
-                NSApp.activate(ignoringOtherApps: true)
-                preview.makeKeyAndOrderFront(nil)
-            } catch {
-                Log.write("fullpage: failed \(error)")
-                NSApp.activate(ignoringOtherApps: true)
-                let alert = NSAlert(error: error)
-                alert.messageText = "Full-page capture failed"
-                alert.runModal()
-            }
         }
     }
 

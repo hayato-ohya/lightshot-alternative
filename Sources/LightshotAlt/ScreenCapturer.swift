@@ -6,25 +6,10 @@ struct ScreenShot {
     let image: CGImage
 }
 
-/// An on-screen window. `frame` is in points; global top-left-origin coordinates when it comes from
-/// `ScreenCapturer`, and screen-local flipped coordinates inside an `OverlayView`.
-struct WindowInfo {
-    let windowID: CGWindowID
-    var frame: CGRect
-    let processID: pid_t
-    let bundleID: String?
-    let appName: String
-    let title: String
-
-    func with(frame: CGRect) -> WindowInfo {
-        WindowInfo(windowID: windowID, frame: frame, processID: processID, bundleID: bundleID, appName: appName, title: title)
-    }
-}
-
 struct CaptureResult {
     let shots: [ScreenShot]
-    /// On-screen windows, front to back.
-    let windows: [WindowInfo]
+    /// Frames of on-screen windows (front to back) in global top-left-origin coordinates, in points.
+    let windowFrames: [CGRect]
 }
 
 enum CaptureError: LocalizedError {
@@ -98,15 +83,11 @@ enum ScreenCapturer {
         }
         guard !shots.isEmpty else { throw CaptureError.noDisplays }
 
-        let windows = content.windows
+        let frames = content.windows
             .filter { $0.isOnScreen && $0.windowLayer == 0 && $0.owningApplication?.processID != selfPID }
-            .filter { $0.frame.width >= 40 && $0.frame.height >= 40 }
-            .map { w in
-                WindowInfo(windowID: w.windowID, frame: w.frame, processID: w.owningApplication?.processID ?? 0,
-                           bundleID: w.owningApplication?.bundleIdentifier, appName: w.owningApplication?.applicationName ?? "",
-                           title: w.title ?? "")
-            }
+            .map(\.frame)
+            .filter { $0.width >= 40 && $0.height >= 40 }
 
-        return CaptureResult(shots: shots, windows: windows)
+        return CaptureResult(shots: shots, windowFrames: frames)
     }
 }
