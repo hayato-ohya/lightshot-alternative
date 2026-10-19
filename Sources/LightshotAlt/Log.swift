@@ -1,9 +1,13 @@
 import Foundation
 
-/// Appends diagnostics to ~/Library/Logs/Lightshot Alternative.log (and the unified log).
+/// Optional diagnostics. Disabled by default; enable with
+///   defaults write com.hayato.lightshot-alternative debugLogging -bool true
+/// and relaunch. Lines go to ~/Library/Logs/Lightshot Alternative.log and the unified log.
 enum Log {
     static let fileURL = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Logs/Lightshot Alternative.log")
+    static let isEnabled = UserDefaults.standard.bool(forKey: "debugLogging")
+
     private static let queue = DispatchQueue(label: "LightshotAlt.log")
     private static let formatter: DateFormatter = {
         let f = DateFormatter()
@@ -11,9 +15,11 @@ enum Log {
         return f
     }()
 
-    static func write(_ message: String) {
-        NSLog("%@", message)
-        let line = "\(formatter.string(from: Date())) [\(ProcessInfo.processInfo.processIdentifier)] \(message)\n"
+    static func write(_ message: @autoclosure () -> String) {
+        guard isEnabled else { return }
+        let text = message()
+        NSLog("%@", text)
+        let line = "\(formatter.string(from: Date())) [\(ProcessInfo.processInfo.processIdentifier)] \(text)\n"
         queue.async {
             guard let data = line.data(using: .utf8) else { return }
             if let handle = try? FileHandle(forWritingTo: fileURL) {

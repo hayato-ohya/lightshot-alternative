@@ -70,7 +70,12 @@ The first capture asks for Screen Recording access. Enable "Lightshot Alternativ
 
 ### Troubleshooting
 
-Diagnostics are written to `~/Library/Logs/Lightshot Alternative.log` (hot key presses, captures, sessions).
+Logging is off by default. To diagnose a problem, enable it and relaunch the app; lines are written to `~/Library/Logs/Lightshot Alternative.log` (hot key presses, captures, sessions).
+
+```sh
+defaults write com.hayato.lightshot-alternative debugLogging -bool true   # enable
+defaults delete com.hayato.lightshot-alternative debugLogging             # disable
+```
 
 ### Layout
 
@@ -161,7 +166,12 @@ xattr -dr com.apple.quarantine "/Applications/Lightshot Alternative.app"
 
 ### トラブルシューティング
 
-`~/Library/Logs/Lightshot Alternative.log` に診断ログ（ホットキー押下、撮影、セッション）が記録されます。
+ログは既定でオフです。問題を調べるときだけ以下で有効にしてアプリを再起動すると、`~/Library/Logs/Lightshot Alternative.log` に診断ログ（ホットキー押下、撮影、セッション）が記録されます。
+
+```sh
+defaults write com.hayato.lightshot-alternative debugLogging -bool true   # 有効化
+defaults delete com.hayato.lightshot-alternative debugLogging             # 無効化
+```
 
 ### 構成
 
