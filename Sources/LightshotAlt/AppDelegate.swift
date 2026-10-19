@@ -159,13 +159,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             showPermissionAlert()
             return
         }
-        beginOverlay(mode: .screenshot)
+        beginOverlay(mode: .screenshot) { _ in }
     }
 
     /// Captures all screens and shows the overlay; `onRecord` fires only in recording mode.
-    private func beginOverlay(mode: OverlayView.Mode,
-                              onRecord: @escaping ((NSScreen, CGRect)) -> Void = { _ in },
-                              onPick: @escaping (WindowInfo) -> Void = { _ in }) {
+    private func beginOverlay(mode: OverlayView.Mode, onRecord: @escaping ((NSScreen, CGRect)) -> Void) {
         capturing = true
         let watchdog = DispatchWorkItem { [weak self] in
             guard let self, self.capturing else { return }
@@ -186,7 +184,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 let session = CaptureSession(result: result, mode: mode)
                 session.onFinish = { [weak self] in self?.session = nil }
                 session.onStartRecording = { screen, rect in onRecord((screen, rect)) }
-                session.onPickWindow = onPick
                 self.session = session
                 session.start()
             } catch CaptureError.permissionDenied {
@@ -226,7 +223,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             showPermissionAlert()
             return
         }
-        beginOverlay(mode: .windowPick, onPick: { [weak self] window in self?.captureFullPage(of: window) })
+        beginOverlay(mode: .windowPick) { _ in }
+        session?.onPickWindow = { [weak self] window in self?.captureFullPage(of: window) }
     }
 
     private func captureFullPage(of window: WindowInfo) {
@@ -288,9 +286,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
         let options = Preferences.shared.recordingOptions
-        beginOverlay(mode: .recording, onRecord: { [weak self] screen, rect in
+        beginOverlay(mode: .recording) { [weak self] screen, rect in
             self?.beginRecording(options: options, screen: screen, rect: rect)
-        })
+        }
     }
 
     private func recordingURL(for options: RecordingOptions) -> URL {
