@@ -26,7 +26,8 @@ No Rosetta 2, no third-party dependencies: just Swift, AppKit and ScreenCaptureK
 
 ### Requirements
 
-- macOS 15 (Sequoia) or later, Apple Silicon or Intel
+- macOS 15 (Sequoia) or later
+- Apple Silicon. The code has no architecture-specific parts and `./build.sh universal` produces an arm64 + x86_64 binary, but Intel Macs are untested; the default build and the .dmg are arm64 only
 - Xcode (Command Line Tools are enough) to build
 
 ### Build and install
@@ -132,7 +133,8 @@ Rosetta 2 に依存せず、Swift + AppKit + ScreenCaptureKit だけで作られ
 
 ### 必要環境
 
-- macOS 15 (Sequoia) 以降、Apple Silicon または Intel
+- macOS 15 (Sequoia) 以降
+- Apple Silicon。コードにアーキテクチャ依存の部分はなく `./build.sh universal` で arm64 + x86_64 のバイナリを作れますが、Intel Mac では未検証です。既定のビルドと .dmg は arm64 専用です
 - ビルドには Xcode（Command Line Tools だけでも可）
 
 ### ビルドとインストール
