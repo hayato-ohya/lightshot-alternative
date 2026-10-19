@@ -15,6 +15,7 @@ No Rosetta 2, no third-party dependencies: just Swift, AppKit and ScreenCaptureK
 - Freezes the screen, then drag to select an area, or click a window to select it
 - Resize the selection with handles, move it by dragging, nudge by 1 px with the arrow keys (⇧+arrows to resize)
 - Annotation tools: pen / marker / line / arrow / rectangle / text, with color, line width and text size; undo (⌘Z)
+- Annotations stay editable: click one to select it, drag to move, drag the end points of a line / arrow or the corners of a rectangle to reshape, double-click text to edit it, change its color / width / size from the palette, Delete to remove, arrow keys to nudge
 - **⌘C / Enter** copies to the clipboard, **⌘S** saves (PNG / JPEG), **Esc** cancels
 - Multi-display support, exports at native Retina resolution
 - Preferences: hot key, save folder, image format, copy-after-save, launch at login
@@ -122,6 +123,7 @@ Rosetta 2 に依存せず、Swift + AppKit + ScreenCaptureKit だけで作られ
 - 画面をフリーズして、ドラッグで範囲選択。ウィンドウをクリックするとそのウィンドウを選択
 - 選択範囲はハンドルでリサイズ、内側をドラッグで移動、矢印キーで 1px 移動（⇧+矢印でサイズ変更）
 - 注釈ツール: ペン / マーカー / 直線 / 矢印 / 矩形 / テキスト、色・線幅・文字サイズの変更、取り消し（⌘Z）
+- 注釈は後から編集可能: クリックで選択、ドラッグで移動、直線・矢印の端点や矩形の四隅をドラッグで変形、テキストはダブルクリックで再編集、パレットから色・線幅・サイズを変更、Delete で削除、矢印キーで1px移動
 - **⌘C / Enter** でクリップボードへコピー、**⌘S** で保存（PNG / JPEG）、**Esc** でキャンセル
 - マルチディスプレイ対応、Retina 解像度で書き出し
 - 設定: ホットキー、保存先フォルダ、画像形式、保存時にコピーも行う、ログイン時に起動

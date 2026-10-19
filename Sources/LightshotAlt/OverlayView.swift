@@ -41,6 +41,8 @@ final class OverlayView: NSView, NSTextFieldDelegate {
         case moving(CGPoint)          // offset of selection origin from mouse
         case resizing(Handle, CGRect) // original rect
         case drawing(Annotation)
+        case movingAnnotation(Annotation, CGPoint)   // last mouse point
+        case editingHandle(Annotation, Int)
     }
 
     let screenshot: CGImage
@@ -59,6 +61,10 @@ final class OverlayView: NSView, NSTextFieldDelegate {
     private var drag: Drag = .none
     private var textField: NSTextField?
     private var textCommitted = false
+    private var editingTextAnnotation: Annotation?   // text being re-edited (removed from `annotations` meanwhile)
+    private var textEntryFontSize: CGFloat = 22
+    private(set) var selectedAnnotation: Annotation?
+    private var undoStack: [[Annotation]] = []
 
     private let toolsBar = PaletteView(orientation: .vertical)
     private let actionsBar = PaletteView(orientation: .horizontal)
@@ -227,6 +233,7 @@ final class OverlayView: NSView, NSTextFieldDelegate {
             for a in annotations { a.draw() }
             if case .drawing(let a) = drag { a.draw() }
             NSGraphicsContext.restoreGraphicsState()
+            if let a = selectedAnnotation { drawAnnotationHandles(a) }
         }
 
         // Dim everything outside the selection.
@@ -271,6 +278,58 @@ final class OverlayView: NSView, NSTextFieldDelegate {
                 p.stroke()
             }
         }
+    }
+
+    private func drawAnnotationHandles(_ a: Annotation) {
+        let handles = a.handlePoints
+        if handles.isEmpty {
+            let box = NSBezierPath(rect: a.bounds.insetBy(dx: -3, dy: -3))
+            box.lineWidth = 1
+            box.setLineDash([4, 3], count: 2, phase: 0)
+            NSColor.white.setStroke()
+            box.stroke()
+            let shadow = NSBezierPath(rect: a.bounds.insetBy(dx: -3, dy: -3))
+            shadow.lineWidth = 1
+            shadow.setLineDash([4, 3], count: 2, phase: 4)
+            NSColor.black.withAlphaComponent(0.6).setStroke()
+            shadow.stroke()
+            return
+        }
+        for p in handles {
+            let r = CGRect(x: p.x - 5, y: p.y - 5, width: 10, height: 10)
+            let path = NSBezierPath(ovalIn: r)
+            NSColor.white.setFill()
+            path.fill()
+            path.lineWidth = 1.5
+            NSColor.controlAccentColor.setStroke()
+            path.stroke()
+        }
+    }
+
+    private func annotationHandle(at p: CGPoint) -> (Annotation, Int)? {
+        guard let a = selectedAnnotation else { return nil }
+        for (i, h) in a.handlePoints.enumerated() where hypot(h.x - p.x, h.y - p.y) <= 8 { return (a, i) }
+        return nil
+    }
+
+    private func annotation(at p: CGPoint) -> Annotation? {
+        annotations.last { $0.hitTest(p) }
+    }
+
+    private func pushUndo() {
+        undoStack.append(annotations.map { $0.copy() })
+        if undoStack.count > 100 { undoStack.removeFirst() }
+    }
+
+    private func select(_ a: Annotation?) {
+        selectedAnnotation = a
+        if let a {
+            // Reflect the selected annotation's style in the palette.
+            color = a.color
+            if a.tool == .text { textSize = a.fontSize } else if a.tool != .marker { lineWidth = a.lineWidth } else { lineWidth = a.lineWidth }
+            refreshToolButtons()
+        }
+        needsDisplay = true
     }
 
     // MARK: - Geometry helpers
@@ -331,6 +390,14 @@ final class OverlayView: NSView, NSTextFieldDelegate {
                     NSCursor.frameResize(position: pos, directions: [.inward, .outward]).set()
                 return
             }
+            if annotationHandle(at: p) != nil {
+                NSCursor.crosshair.set()
+                return
+            }
+            if sel.contains(p), annotation(at: p) != nil {
+                NSCursor.openHand.set()
+                return
+            }
             if tool == nil, sel.contains(p) {
                 NSCursor.openHand.set()
                 return
@@ -363,12 +430,30 @@ final class OverlayView: NSView, NSTextFieldDelegate {
             window?.makeFirstResponder(self)
         }
         let p = convert(event.locationInWindow, from: nil)
-        if textField != nil { commitText() }
+        if textField != nil {
+            // Clicking inside the active text field is handled by the field itself.
+            if let tf = textField, tf.frame.contains(p) { super.mouseDown(with: event); return }
+            commitText()
+        }
 
         if let sel = selection {
-            if let h = handle(at: p) {
+            if let (a, index) = annotationHandle(at: p) {
+                pushUndo()
+                drag = .editingHandle(a, index)
+            } else if sel.contains(p), let hit = annotation(at: p) {
+                if event.clickCount == 2, case .text = hit.shape {
+                    beginTextReedit(hit)
+                    return
+                }
+                select(hit)
+                pushUndo()
+                drag = .movingAnnotation(hit, p)
+                NSCursor.closedHand.set()
+            } else if let h = handle(at: p) {
+                select(nil)
                 drag = .resizing(h, sel)
             } else if let tool, sel.contains(p) {
+                select(nil)
                 switch tool {
                 case .text:
                     beginTextEntry(at: p)
@@ -383,6 +468,7 @@ final class OverlayView: NSView, NSTextFieldDelegate {
                     drag = .drawing(Annotation(shape: .rect(CGRect(origin: p, size: .zero)), tool: tool, color: color, lineWidth: lineWidth))
                 }
             } else if sel.contains(p) {
+                select(nil)
                 drag = .moving(CGPoint(x: sel.minX - p.x, y: sel.minY - p.y))
                 NSCursor.closedHand.set()
             } else {
@@ -398,6 +484,8 @@ final class OverlayView: NSView, NSTextFieldDelegate {
     private func startNewSelection(at p: CGPoint) {
         delegate?.overlayViewDidBeginSelection(self)
         annotations.removeAll()
+        undoStack.removeAll()
+        selectedAnnotation = nil
         tool = nil
         refreshToolButtons()
         selection = nil
@@ -439,6 +527,11 @@ final class OverlayView: NSView, NSTextFieldDelegate {
             case .text:
                 break
             }
+        case .movingAnnotation(let a, let last):
+            a.move(by: CGPoint(x: p.x - last.x, y: p.y - last.y))
+            drag = .movingAnnotation(a, p)
+        case .editingHandle(let a, let index):
+            a.setHandle(index, to: p)
         }
         layoutChrome()
         needsDisplay = true
@@ -460,7 +553,16 @@ final class OverlayView: NSView, NSTextFieldDelegate {
             break
         case .drawing(let a):
             if case .rect(let r) = a.shape { a.shape = .rect(r.standardized) }
-            if !a.isDegenerate { annotations.append(a) }
+            if !a.isDegenerate {
+                pushUndo()
+                annotations.append(a)
+                selectedAnnotation = a
+            }
+        case .movingAnnotation, .editingHandle:
+            if let a = selectedAnnotation, a.isDegenerate {
+                annotations.removeAll { $0 === a }
+                selectedAnnotation = nil
+            }
         }
         drag = .none
         if let sel = selection, sel.width < 1 || sel.height < 1 { selection = nil }
@@ -475,7 +577,9 @@ final class OverlayView: NSView, NSTextFieldDelegate {
         let flags = event.modifierFlags.intersection([.command, .shift, .option, .control])
         switch event.keyCode {
         case 53: // Esc
-            delegate?.overlayViewDidRequestCancel(self)
+            if selectedAnnotation != nil { select(nil) } else { delegate?.overlayViewDidRequestCancel(self) }
+        case 51, 117: // Delete / Forward delete
+            deleteSelectedAnnotation()
         case 36, 76: // Return / Enter
             if mode == .recording { recordAction(nil) } else { copyAction(nil) }
         case 123, 124, 125, 126: // arrows
@@ -505,9 +609,29 @@ final class OverlayView: NSView, NSTextFieldDelegate {
         needsDisplay = true
     }
 
+    private func deleteSelectedAnnotation() {
+        guard let a = selectedAnnotation else { return }
+        pushUndo()
+        annotations.removeAll { $0 === a }
+        selectedAnnotation = nil
+        needsDisplay = true
+    }
+
     private func nudge(keyCode: UInt16, resize: Bool) {
-        guard var sel = selection else { return }
         let d: CGFloat = 1
+        if let a = selectedAnnotation, !resize {
+            pushUndo()
+            switch keyCode {
+            case 123: a.move(by: CGPoint(x: -d, y: 0))
+            case 124: a.move(by: CGPoint(x: d, y: 0))
+            case 125: a.move(by: CGPoint(x: 0, y: d))
+            case 126: a.move(by: CGPoint(x: 0, y: -d))
+            default: break
+            }
+            needsDisplay = true
+            return
+        }
+        guard var sel = selection else { return }
         if resize {
             switch keyCode {
             case 123: sel.size.width -= d
@@ -536,6 +660,7 @@ final class OverlayView: NSView, NSTextFieldDelegate {
         if textField != nil { commitText() }
         let t = Tool.allCases[sender.tag]
         tool = (tool == t) ? nil : t
+        select(nil)
         refreshToolButtons()
     }
 
@@ -620,28 +745,37 @@ final class OverlayView: NSView, NSTextFieldDelegate {
 
     @objc private func paletteColorClicked(_ sender: NSButton) {
         color = OverlayView.palette[sender.tag]
+        if let a = selectedAnnotation { pushUndo(); a.color = color }
+        textField?.textColor = color
         refreshToolButtons()
         colorPopover?.close()
+        needsDisplay = true
     }
 
     @objc private func widthClicked(_ sender: NSButton) {
         lineWidth = [2.0, 3.0, 5.0, 8.0][sender.tag]
+        if let a = selectedAnnotation, a.tool != .text { pushUndo(); a.lineWidth = lineWidth }
         colorPopover?.close()
+        needsDisplay = true
     }
 
     @objc private func textSizeClicked(_ sender: NSButton) {
         textSize = Annotation.textSizes[sender.tag]
+        if let a = selectedAnnotation, a.tool == .text { pushUndo(); a.fontSize = textSize }
         if let tf = textField {
+            textEntryFontSize = textSize
             tf.font = Annotation.textFont(size: textSize)
             tf.setFrameSize(NSSize(width: tf.frame.width, height: textSize * 1.5))
         }
         colorPopover?.close()
+        needsDisplay = true
     }
 
     @objc private func undo(_ sender: Any?) {
         if textField != nil { cancelText(); return }
-        guard !annotations.isEmpty else { return }
-        annotations.removeLast()
+        guard let previous = undoStack.popLast() else { return }
+        annotations = previous
+        selectedAnnotation = nil
         needsDisplay = true
     }
 
@@ -668,9 +802,24 @@ final class OverlayView: NSView, NSTextFieldDelegate {
 
     // MARK: - Text entry
 
-    private func beginTextEntry(at p: CGPoint) {
+    private func beginTextReedit(_ a: Annotation) {
+        guard case .text(let string, let origin) = a.shape else { return }
+        pushUndo()
+        annotations.removeAll { $0 === a }
+        selectedAnnotation = nil
+        editingTextAnnotation = a
+        color = a.color
+        textSize = a.fontSize
+        refreshToolButtons()
+        beginTextEntry(at: CGPoint(x: origin.x, y: origin.y), initialText: string)
+        needsDisplay = true
+    }
+
+    private func beginTextEntry(at p: CGPoint, initialText: String = "") {
         guard let sel = selection else { return }
+        textEntryFontSize = textSize
         let tf = NSTextField(frame: CGRect(x: p.x - 2, y: p.y - 4, width: max(80, sel.maxX - p.x + 2), height: textSize * 1.5))
+        tf.stringValue = initialText
         tf.isBordered = false
         tf.drawsBackground = false
         tf.focusRingType = .none
@@ -696,8 +845,12 @@ final class OverlayView: NSView, NSTextFieldDelegate {
         tf.removeFromSuperview()
         textField = nil
         window?.makeFirstResponder(self)
-        let a = Annotation(shape: .text(string, origin), tool: .text, color: color, lineWidth: lineWidth, fontSize: textSize)
-        if !a.isDegenerate { annotations.append(a) }
+        let a = Annotation(shape: .text(string, origin), tool: .text, color: color, lineWidth: lineWidth, fontSize: textEntryFontSize)
+        editingTextAnnotation = nil
+        if !a.isDegenerate {
+            annotations.append(a)
+            selectedAnnotation = a
+        }
         needsDisplay = true
     }
 
@@ -707,6 +860,12 @@ final class OverlayView: NSView, NSTextFieldDelegate {
         tf.removeFromSuperview()
         textField = nil
         window?.makeFirstResponder(self)
+        if let a = editingTextAnnotation {
+            annotations.append(a) // restore the original text when re-editing is cancelled
+            editingTextAnnotation = nil
+            _ = undoStack.popLast()
+        }
+        needsDisplay = true
     }
 
     func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
@@ -762,6 +921,8 @@ final class OverlayView: NSView, NSTextFieldDelegate {
         if textField != nil { cancelText() }
         selection = nil
         annotations.removeAll()
+        undoStack.removeAll()
+        selectedAnnotation = nil
         drag = .none
         tool = nil
         refreshToolButtons()
