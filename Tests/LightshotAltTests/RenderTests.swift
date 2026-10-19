@@ -79,6 +79,14 @@ final class RenderTests: XCTestCase {
         XCTAssertLessThan(single.b, 200, "marker should visibly darken the blue")
     }
 
+    func testRecordingModeOverlaySurvivesSelectionReset() {
+        let view = OverlayView(frame: CGRect(x: 0, y: 0, width: 100, height: 80),
+                               screenshot: makeScreenshot(scale: 1), scale: 1, windowFrames: [], mode: .recording)
+        view.selection = CGRect(x: 10, y: 10, width: 20, height: 20)
+        view.clearSelection() // used to crash: no color button exists in recording mode
+        XCTAssertNil(view.selection)
+    }
+
     func testHotKeyDisplayString() {
         XCTAssertEqual(HotKey.default.displayString, "⇧⌘9")
         XCTAssertEqual(HotKey(keyCode: 122, modifiers: []).displayString, "F1")

@@ -65,7 +65,7 @@ final class OverlayView: NSView, NSTextFieldDelegate {
     private let sizeLabel = NSTextField(labelWithString: "")
     private let hintLabel = NSTextField(labelWithString: "Drag to select an area  ·  Click a window  ·  Esc to cancel")
     private var toolButtons: [Tool: NSButton] = [:]
-    private var colorButton: NSButton!
+    private var colorButton: NSButton?
     private var colorPopover: NSPopover?
 
     static let palette: [NSColor] = [
@@ -121,9 +121,10 @@ final class OverlayView: NSView, NSTextFieldDelegate {
             b.tag = Tool.allCases.firstIndex(of: t)!
             toolButtons[t] = b
         }
-        colorButton = NSButton(image: swatchImage(color: color), target: self, action: #selector(colorButtonClicked(_:)))
+        let colorButton = NSButton(image: swatchImage(color: color), target: self, action: #selector(colorButtonClicked(_:)))
         toolsBar.configure(colorButton, tooltip: "Color & line width")
         toolsBar.addView(colorButton)
+        self.colorButton = colorButton
         toolsBar.addButton(symbol: "arrow.uturn.backward", tooltip: "Undo (⌘Z)", target: self, action: #selector(undo(_:)))
         toolsBar.fit()
         toolsBar.isHidden = true
@@ -213,7 +214,7 @@ final class OverlayView: NSView, NSTextFieldDelegate {
 
     private func refreshToolButtons() {
         for (t, b) in toolButtons { PaletteView.setActive(b, t == tool) }
-        colorButton.image = swatchImage(color: color)
+        colorButton?.image = swatchImage(color: color)
     }
 
     // MARK: - Drawing
