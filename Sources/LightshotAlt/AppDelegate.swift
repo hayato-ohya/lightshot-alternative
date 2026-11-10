@@ -15,6 +15,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var recordingTimer: Timer?
     private var startingRecording = false
     private var stoppingRecording = false
+    private var stopTask: Task<Void, Never>?
+    /// A finished recording in the temp folder that is waiting for the save panel.
+    private var unsavedRecordingURL: URL?
+    private var terminating = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Log.write("launch: \(Bundle.main.bundlePath) permission=\(ScreenCapturer.hasPermission)")
@@ -47,12 +51,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard let recorder else { return .terminateNow }
-        Task { @MainActor in
-            _ = try? await recorder.stop()
+        terminating = true
+        if recorder != nil { stopRecording() }
+        guard stopTask != nil || unsavedRecordingURL != nil else { return .terminateNow }
+        // Wait until the file is finalized, and never leave a recording behind in the temp folder.
+        let task = stopTask
+        Task { @MainActor [self] in
+            await task?.value
+            if let url = unsavedRecordingURL { keepInSaveDirectory(url) }
             NSApp.reply(toApplicationShouldTerminate: true)
         }
         return .terminateLater
+    }
+
+    /// Moves a recording from the temp folder into the default save folder without asking.
+    private func keepInSaveDirectory(_ url: URL) {
+        unsavedRecordingURL = nil
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        let directory = Preferences.shared.saveDirectory
+        let base = url.deletingPathExtension().lastPathComponent
+        var destination = directory.appendingPathComponent(url.lastPathComponent)
+        var n = 2
+        while FileManager.default.fileExists(atPath: destination.path) {
+            destination = directory.appendingPathComponent("\(base) \(n)").appendingPathExtension(url.pathExtension)
+            n += 1
+        }
+        do {
+            try FileManager.default.moveItem(at: url, to: destination)
+            Log.write("recording: kept at \(destination.path)")
+        } catch {
+            Log.write("recording: could not move \(url.path) to \(destination.path): \(error)")
+        }
     }
 
     // MARK: - Status item & menu
@@ -277,13 +306,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         dimWindow?.close()
         dimWindow = nil
         showIdleStatusIcon()
-        Task { @MainActor [self] in
-            defer { stoppingRecording = false }
+        // Captured now: the file is in the temp folder only if this was on when recording started.
+        let inTempFolder = recorder.outputURL.deletingLastPathComponent().standardizedFileURL
+            == FileManager.default.temporaryDirectory.standardizedFileURL
+        stopTask = Task { @MainActor [self] in
+            defer { stoppingRecording = false; stopTask = nil }
             do {
                 let url = try await recorder.stop()
                 Log.write("recording: saved \(url.path)")
-                if Preferences.shared.askWhereToSaveRecording {
-                    moveWithSavePanel(url)
+                if inTempFolder {
+                    if terminating { keepInSaveDirectory(url) } else { moveWithSavePanel(url) }
                 }
             } catch {
                 Log.write("recording: stop failed \(error)")
@@ -302,7 +334,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         panel.allowedContentTypes = [UTType(filenameExtension: url.pathExtension) ?? .movie]
         panel.canCreateDirectories = true
         NSApp.activate(ignoringOtherApps: true)
-        panel.begin { response in
+        unsavedRecordingURL = url
+        panel.begin { [weak self] response in
+            // Already moved to the save folder because the app is quitting.
+            guard let self, self.unsavedRecordingURL == url else { return }
+            self.unsavedRecordingURL = nil
             guard response == .OK, let destination = panel.url else {
                 try? FileManager.default.removeItem(at: url)
                 return
