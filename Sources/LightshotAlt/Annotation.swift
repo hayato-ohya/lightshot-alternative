@@ -211,6 +211,26 @@ extension Annotation {
         }
     }
 
+    /// Updates a shape that is still being drawn so that it ends at `p`.
+    func extendDrawing(to p: CGPoint) {
+        switch shape {
+        case .path(var pts):
+            if let last = pts.last, hypot(p.x - last.x, p.y - last.y) < 1.5 { return }
+            pts.append(p)
+            shape = .path(pts)
+        case .line(let s, _):
+            shape = .line(s, p)
+        case .arrow(let s, _):
+            shape = .arrow(s, p)
+        case .rect(let r):
+            // `origin` is the drag anchor. `minX`/`minY` would return the normalized corner once
+            // the size goes negative, which made the anchor drift when dragging left or up.
+            shape = .rect(CGRect(x: r.origin.x, y: r.origin.y, width: p.x - r.origin.x, height: p.y - r.origin.y))
+        case .text:
+            break
+        }
+    }
+
     func move(by d: CGPoint) {
         func t(_ p: CGPoint) -> CGPoint { CGPoint(x: p.x + d.x, y: p.y + d.y) }
         switch shape {

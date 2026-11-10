@@ -513,20 +513,7 @@ final class OverlayView: NSView, NSTextFieldDelegate {
             if h.affectsBottom { maxY = p.y }
             selection = snapped(CGRect(x: min(minX, maxX), y: min(minY, maxY), width: abs(maxX - minX), height: abs(maxY - minY)))
         case .drawing(let a):
-            switch a.shape {
-            case .path(var pts):
-                if let last = pts.last, hypot(p.x - last.x, p.y - last.y) < 1.5 { return }
-                pts.append(p)
-                a.shape = .path(pts)
-            case .line(let s, _):
-                a.shape = .line(s, p)
-            case .arrow(let s, _):
-                a.shape = .arrow(s, p)
-            case .rect(let r):
-                a.shape = .rect(CGRect(x: r.minX, y: r.minY, width: p.x - r.minX, height: p.y - r.minY))
-            case .text:
-                break
-            }
+            a.extendDrawing(to: p)
         case .movingAnnotation(let a, let last):
             a.move(by: CGPoint(x: p.x - last.x, y: p.y - last.y))
             drag = .movingAnnotation(a, p)
@@ -846,8 +833,11 @@ final class OverlayView: NSView, NSTextFieldDelegate {
         textField = nil
         window?.makeFirstResponder(self)
         let a = Annotation(shape: .text(string, origin), tool: .text, color: color, lineWidth: lineWidth, fontSize: textEntryFontSize)
+        // Re-editing already recorded an undo step in beginTextReedit; new text needs its own.
+        let isNewText = editingTextAnnotation == nil
         editingTextAnnotation = nil
         if !a.isDegenerate {
+            if isNewText { pushUndo() }
             annotations.append(a)
             selectedAnnotation = a
         }

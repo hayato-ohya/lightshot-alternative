@@ -171,6 +171,11 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
 
         let hadSamples: Bool = await withCheckedContinuation { continuation in
             queue.async {
+                // Frames only arrive when the screen changes, so without this the video would end
+                // at the last change instead of at the moment the recording was stopped.
+                if self.sessionStartTime != nil, writer.status == .writing {
+                    writer.endSession(atSourceTime: CMClockGetTime(CMClockGetHostTimeClock()))
+                }
                 self.videoInput?.markAsFinished()
                 self.audioInput?.markAsFinished()
                 continuation.resume(returning: self.wroteSamples)

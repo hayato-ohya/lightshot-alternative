@@ -17,6 +17,14 @@ final class AnnotationEditingTests: XCTestCase {
         } else { XCTFail() }
     }
 
+    func testDrawingRectUpAndLeftKeepsTheStartCorner() {
+        let a = Annotation(shape: .rect(CGRect(origin: CGPoint(x: 100, y: 100), size: .zero)), tool: .rect, color: .red, lineWidth: 3)
+        for p in [CGPoint(x: 90, y: 95), CGPoint(x: 80, y: 120), CGPoint(x: 50, y: 60)] { a.extendDrawing(to: p) }
+        if case .rect(let r) = a.shape {
+            XCTAssertEqual(r.standardized, CGRect(x: 50, y: 60, width: 50, height: 40))
+        } else { XCTFail() }
+    }
+
     func testRectHitsEdgesOnlyAndCornerHandleKeepsOppositeCorner() {
         let a = Annotation(shape: .rect(CGRect(x: 20, y: 20, width: 100, height: 60)), tool: .rect, color: .blue, lineWidth: 4)
         XCTAssertTrue(a.hitTest(CGPoint(x: 70, y: 21)), "on the top edge")
